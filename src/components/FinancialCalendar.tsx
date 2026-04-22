@@ -27,6 +27,7 @@ import { ptBR } from 'date-fns/locale';
 export default function FinancialCalendar() {
   const { transactions, debts } = useFinance();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -86,10 +87,12 @@ export default function FinancialCalendar() {
           return (
             <div 
               key={day.toString()}
+              onClick={() => setSelectedDay(day)}
               className={cn(
-                "min-h-[100px] p-2 border-r border-b border-[#E2E8F0] flex flex-col gap-1 transition-colors hover:bg-slate-50",
+                "min-h-[100px] p-2 border-r border-b border-[#E2E8F0] flex flex-col gap-1 transition-colors hover:bg-slate-50 cursor-pointer",
                 !isCurrentMonth && "bg-slate-50/50",
-                i % 7 === 6 && "border-r-0"
+                i % 7 === 6 && "border-r-0",
+                selectedDay && isSameDay(day, selectedDay) && "bg-primary/5 border-primary/20"
               )}
             >
               <span className={cn(
@@ -100,7 +103,7 @@ export default function FinancialCalendar() {
               </span>
               
               <div className="flex flex-col gap-1 overflow-hidden">
-                {dayTransactions.slice(0, 2).map((t, idx) => (
+                {dayTransactions.slice(0, 2).map((t) => (
                   <div 
                     key={t.id} 
                     className={cn(
@@ -126,6 +129,68 @@ export default function FinancialCalendar() {
           );
         })}
       </div>
+
+      <AnimatePresence>
+        {selectedDay && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t border-[#E2E8F0] bg-slate-50 overflow-hidden"
+          >
+            <div className="p-6">
+               <div className="flex justify-between items-center mb-6">
+                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                   <Calendar className="w-5 h-5 text-primary" />
+                   Lançamentos do dia {format(selectedDay, "dd 'de' MMMM", { locale: ptBR })}
+                 </h3>
+                 <button onClick={() => setSelectedDay(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-white rounded-lg shadow-sm border border-slate-200">
+                   Fechar
+                 </button>
+               </div>
+
+               {getDayTransactions(selectedDay).length === 0 && getDayDebts(selectedDay).length === 0 ? (
+                 <p className="text-sm font-medium text-slate-400 text-center py-6">Nenhuma movimentação neste dia.</p>
+               ) : (
+                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                   {getDayTransactions(selectedDay).map(t => (
+                     <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                         <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", t.type === 'income' ? 'bg-emerald-50 text-emerald-500' : 'bg-orange-50 text-orange-500')}>
+                           {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                         </div>
+                         <div>
+                           <p className="font-bold text-slate-800">{t.description}</p>
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(new Date(t.date), "HH:mm")} • {t.category}</p>
+                         </div>
+                       </div>
+                       <p className={cn("font-bold", t.type === 'income' ? 'text-emerald-500' : 'text-orange-500')}>
+                         {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                       </p>
+                     </div>
+                   ))}
+                   {getDayDebts(selectedDay).map(d => (
+                     <div key={d.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between opacity-75">
+                       <div className="flex items-center gap-4">
+                         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-50 text-red-500">
+                           <CreditCard className="w-5 h-5" />
+                         </div>
+                         <div>
+                           <p className="font-bold text-slate-800">Dívida/Fatura: {d.title}</p>
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Parcela {d.paidInstallments}/{d.totalInstallments}</p>
+                         </div>
+                       </div>
+                       <p className="font-bold text-red-500">
+                         {formatCurrency(d.monthlyPayment)}
+                       </p>
+                     </div>
+                   ))}
+                 </div>
+               )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

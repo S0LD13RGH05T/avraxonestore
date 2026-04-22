@@ -102,16 +102,16 @@ export default function DebtManagement() {
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-              <div className="relative z-10">
-                <p className="text-lg font-black tracking-tight mb-4">{card.name}</p>
-                <div className="flex justify-between items-end">
+              <div className="relative z-10 flex flex-col h-full justify-end">
+                <p className="text-xl md:text-2xl font-black tracking-tight mb-6 md:mb-8 break-words leading-tight">{card.name}</p>
+                <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-end gap-4 mt-auto">
                   <div>
-                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest">Limite Disponível</p>
-                    <p className="text-xl font-bold">{formatCurrency(card.limit - card.balance)}</p>
+                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest mb-1">Limite Disponível</p>
+                    <p className="text-xl md:text-2xl font-bold">{formatCurrency(card.limit - card.balance)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest">Vencimento</p>
-                    <p className="text-sm font-bold">DIA {card.closingDay}</p>
+                  <div className="text-left sm:text-right">
+                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest mb-1">Vencimento</p>
+                    <p className="text-sm md:text-base font-bold bg-white/10 px-3 py-1 rounded-lg inline-block">DIA {card.closingDay}</p>
                   </div>
                 </div>
               </div>
@@ -141,14 +141,18 @@ export default function DebtManagement() {
 }
 
 function DebtCard({ debt }: { debt: Debt }) {
-  const { deleteDebt, payDebtInstallment } = useFinance();
+  const { deleteDebt, payDebtInstallment, markDebtDelayed } = useFinance();
   const [isPinging, setIsPinging] = useState(false);
   const progress = ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100;
   
-  const handlePayment = async (isDelayed: boolean = false) => {
+  const handlePayment = async () => {
     setIsPinging(true);
-    await payDebtInstallment(debt, isDelayed);
+    await payDebtInstallment(debt, false);
     setTimeout(() => setIsPinging(false), 1000);
+  };
+
+  const handleDelay = async () => {
+    await markDebtDelayed(debt.id);
   };
 
   return (
@@ -177,14 +181,14 @@ function DebtCard({ debt }: { debt: Debt }) {
       <div className="flex items-start justify-between mb-8 pr-10">
         <div className="flex items-center gap-4">
           <div className={cn(
-            "w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all",
+            "w-12 h-12 md:w-14 md:h-14 flex-shrink-0 rounded-2xl flex items-center justify-center shadow-sm transition-all",
             debt.status === 'paid' ? "bg-emerald-500/10 text-emerald-500" : 
             debt.status === 'delayed' ? "bg-orange-500/10 text-orange-500" : "bg-red-500/10 text-red-500"
           )}>
-            {debt.status === 'paid' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+            {debt.status === 'paid' ? <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8" /> : <AlertCircle className="w-6 h-6 md:w-8 md:h-8" />}
           </div>
           <div>
-            <h4 className="text-xl font-black text-white tracking-tight">{debt.title}</h4>
+            <h4 className="text-lg md:text-xl font-black text-white tracking-tight break-words">{debt.title}</h4>
             <div className="flex items-center gap-2 mt-1">
                <span className={cn(
                  "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
@@ -236,18 +240,18 @@ function DebtCard({ debt }: { debt: Debt }) {
                </p>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button 
-                onClick={() => handlePayment(true)}
-                className="flex-1 bg-slate-800 border-2 border-orange-500/20 text-orange-500 p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500/10 transition-all flex items-center justify-center gap-2"
+                onClick={handleDelay}
+                className="flex-1 bg-slate-800 border-2 border-orange-500/20 text-orange-500 py-3 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500/10 transition-all flex items-center justify-center gap-2"
               >
                  Atrasada
               </button>
               <button 
-                onClick={() => handlePayment(false)}
-                className="flex-[1.5] bg-emerald-500 text-white p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                onClick={handlePayment}
+                className="flex-[1.5] bg-emerald-500 text-white py-3 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
-                 <Plus className="w-4 h-4" /> Marcar como Paga
+                 <Plus className="w-4 h-4" /> Marcar Paga
               </button>
             </div>
           </div>

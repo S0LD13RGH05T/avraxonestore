@@ -19,7 +19,7 @@ import {
   Bell,
   ArrowUpRight,
   ArrowDownRight,
-  LayoutDashboard,
+  Infinity as InfinityIcon,
   CreditCard,
   Flag,
   Zap,
@@ -235,7 +235,7 @@ export default function Dashboard() {
               activeTab === 'home' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
             )}
           >
-            <LayoutDashboard className="w-5 h-5" /> Início
+            <InfinityIcon className="w-5 h-5" /> Início
           </button>
           <button 
             onClick={() => setActiveTab('debts')}
@@ -447,9 +447,15 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold text-red-500">{formatCurrency(totalExpense)}</h2>
                 </div>
 
-                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-sm">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Dívidas Ativas</p>
-                  <h2 className="text-2xl font-bold text-accent">{formatCurrency(finance.debts.reduce((acc, d) => acc + (d.status === 'active' ? d.remainingAmount : 0), 0))}</h2>
+                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Dívidas Ativas</p>
+                    <h2 className="text-2xl font-bold text-accent">{formatCurrency(finance.debts.reduce((acc, d) => acc + (d.status === 'active' ? d.remainingAmount : 0), 0))}</h2>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-800/50">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Pendentes:</p>
+                    <p className="text-xs font-bold text-orange-500">{formatCurrency(finance.debts.reduce((acc, d) => acc + (d.status === 'delayed' ? d.remainingAmount : 0), 0))}</p>
+                  </div>
                 </div>
               </div>
 
@@ -849,23 +855,6 @@ export default function Dashboard() {
                  </div>
 
                  <div className="space-y-8">
-                    {/* Icon Scale */}
-                    <div className="space-y-4">
-                       <div className="flex justify-between items-center px-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tamanho dos Ícones</label>
-                          <span className="text-[10px] font-bold text-primary">{Math.round(iconScale * 100)}%</span>
-                       </div>
-                       <input 
-                         type="range"
-                         min="0.8"
-                         max="1.5"
-                         step="0.1"
-                         value={iconScale}
-                         onChange={e => setIconScale(parseFloat(e.target.value))}
-                         className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
-                       />
-                    </div>
-
                     <button 
                       onClick={logout}
                       className="w-full py-4 bg-red-500/10 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
@@ -883,31 +872,31 @@ export default function Dashboard() {
         <NavItem 
           active={activeTab === 'home'} 
           onClick={() => setActiveTab('home')} 
-          icon={<LayoutDashboard className="w-5 h-5 transition-transform" style={{ transform: `scale(${iconScale})` }} />} 
+          icon={<InfinityIcon className="w-5 h-5 transition-transform" />} 
           label="" 
         />
         <NavItem 
           active={activeTab === 'debts'} 
           onClick={() => setActiveTab('debts')} 
-          icon={<CreditCard className="w-5 h-5 transition-transform" style={{ transform: `scale(${iconScale})` }} />} 
+          icon={<CreditCard className="w-5 h-5 transition-transform" />} 
           label="" 
         />
         <NavItem 
           active={activeTab === 'goals'} 
           onClick={() => setActiveTab('goals')} 
-          icon={<Flag className="w-5 h-5 transition-transform" style={{ transform: `scale(${iconScale})` }} />} 
+          icon={<Flag className="w-5 h-5 transition-transform" />} 
           label="" 
         />
         <NavItem 
           active={activeTab === 'calendar'} 
           onClick={() => setActiveTab('calendar')} 
-          icon={<Calendar className="w-5 h-5 transition-transform" style={{ transform: `scale(${iconScale})` }} />} 
+          icon={<Calendar className="w-5 h-5 transition-transform" />} 
           label="" 
         />
         <NavItem 
           active={activeTab === 'relationship'} 
           onClick={() => setActiveTab('relationship')} 
-          icon={<Heart className="w-5 h-5 transition-transform" style={{ transform: `scale(${iconScale})` }} />} 
+          icon={<Heart className="w-5 h-5 transition-transform" />} 
           label="" 
         />
       </nav>

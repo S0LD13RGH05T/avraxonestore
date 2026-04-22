@@ -255,7 +255,14 @@ export function useFinance() {
       type: 'expense'
     });
 
-    await addLog(`Pagou parcela de ${debt.title}${isDelayed ? ' (em atraso)' : ''}`);
+    await addLog(`Pagou parcela de ${debt.title}`);
+  };
+
+  const markDebtDelayed = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const debtRef = doc(db, 'couples', profile.currentCoupleId, 'debts', id);
+    await updateDoc(debtRef, { status: 'delayed' });
+    await addLog(`Marcou dívida como atrasada`);
   };
 
   const updateGoalAmount = async (id: string, newAmount: number) => {
@@ -286,6 +293,7 @@ export function useFinance() {
     addDebt,
     deleteDebt,
     payDebtInstallment,
+    markDebtDelayed,
     addGoal,
     deleteGoal,
     updateGoalAmount,
