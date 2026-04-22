@@ -103,15 +103,15 @@ export default function DebtManagement() {
                 </button>
               </div>
               <div className="relative z-10 flex flex-col h-full justify-end">
-                <p className="text-xl md:text-2xl font-black tracking-tight mb-6 md:mb-8 break-words leading-tight">{card.name}</p>
-                <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-end gap-4 mt-auto">
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest mb-1">Limite Disponível</p>
-                    <p className="text-xl md:text-2xl font-bold">{formatCurrency(card.limit - card.balance)}</p>
+                <p className="text-xl md:text-2xl font-black tracking-tight mb-8 md:mb-10 break-words leading-tight">{card.name}</p>
+                <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-end gap-6 mt-auto">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest">Limite Disponível</p>
+                    <p className="text-2xl md:text-3xl font-bold">{formatCurrency(card.limit - card.balance)}</p>
                   </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest mb-1">Vencimento</p>
-                    <p className="text-sm md:text-base font-bold bg-white/10 px-3 py-1 rounded-lg inline-block">DIA {card.closingDay}</p>
+                  <div className="text-left sm:text-right space-y-1">
+                    <p className="text-[9px] font-black uppercase text-white/40 tracking-widest">Vencimento</p>
+                    <p className="text-sm md:text-base font-bold bg-white/10 px-4 py-2 rounded-xl inline-block shadow-inner">DIA {card.closingDay}</p>
                   </div>
                 </div>
               </div>
@@ -178,8 +178,8 @@ function DebtCard({ debt }: { debt: Debt }) {
         </button>
       </div>
 
-      <div className="flex items-start justify-between mb-8 pr-10">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start justify-between mb-8 pr-10 sm:pr-12 gap-6 sm:gap-4">
+        <div className="flex items-center gap-4 w-full">
           <div className={cn(
             "w-12 h-12 md:w-14 md:h-14 flex-shrink-0 rounded-2xl flex items-center justify-center shadow-sm transition-all",
             debt.status === 'paid' ? "bg-emerald-500/10 text-emerald-500" : 
@@ -203,9 +203,9 @@ function DebtCard({ debt }: { debt: Debt }) {
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-black text-white tracking-tighter">{formatCurrency(debt.remainingAmount)}</p>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Restante</p>
+        <div className="text-left sm:text-right mt-4 sm:mt-0 w-full sm:w-auto">
+          <p className="text-2xl sm:text-3xl font-black text-white tracking-tighter break-words">{formatCurrency(debt.remainingAmount)}</p>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Restante a Pagar</p>
         </div>
       </div>
 

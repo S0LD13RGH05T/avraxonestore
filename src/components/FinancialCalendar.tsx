@@ -47,31 +47,31 @@ export default function FinancialCalendar() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-sm">
-      <div className="p-8 border-b border-[#E2E8F0] flex items-center justify-between bg-primary/5">
+    <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
+      <div className="p-8 border-b border-slate-800 flex items-center justify-between bg-slate-800/30">
         <div>
-          <h2 className="text-xl font-bold capitalize text-[#1E293B]">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
-          <p className="text-xs font-medium text-slate-400">Calendário de Movimentações</p>
+          <h2 className="text-xl font-bold capitalize text-white">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</h2>
+          <p className="text-xs font-medium text-slate-500">Calendário de Movimentações</p>
         </div>
         <div className="flex gap-2">
           <button 
             onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-            className="p-2 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-[#E2E8F0]"
+            className="p-2 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
           >
             <ChevronLeft className="w-5 h-5 text-slate-400" />
           </button>
           <button 
             onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-            className="p-2 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-[#E2E8F0]"
+            className="p-2 hover:bg-slate-800 rounded-xl transition-colors border border-transparent hover:border-slate-700"
           >
             <ChevronRight className="w-5 h-5 text-slate-400" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 border-b border-[#E2E8F0]">
+      <div className="grid grid-cols-7 border-b border-slate-800">
         {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-          <div key={day} className="py-4 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+          <div key={day} className="py-4 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
             {day}
           </div>
         ))}
@@ -89,15 +89,15 @@ export default function FinancialCalendar() {
               key={day.toString()}
               onClick={() => setSelectedDay(day)}
               className={cn(
-                "min-h-[100px] p-2 border-r border-b border-[#E2E8F0] flex flex-col gap-1 transition-colors hover:bg-slate-50 cursor-pointer",
-                !isCurrentMonth && "bg-slate-50/50",
+                "min-h-[100px] p-2 border-r border-b border-slate-800 flex flex-col gap-1 transition-colors hover:bg-slate-800/50 cursor-pointer",
+                !isCurrentMonth && "bg-slate-900/50 opacity-50",
                 i % 7 === 6 && "border-r-0",
-                selectedDay && isSameDay(day, selectedDay) && "bg-primary/5 border-primary/20"
+                selectedDay && isSameDay(day, selectedDay) && "bg-primary/10 border-primary/30"
               )}
             >
               <span className={cn(
                 "text-[10px] font-bold mb-1",
-                isSameDay(day, new Date()) ? "text-primary bg-primary/10 w-5 h-5 flex items-center justify-center rounded-full" : isCurrentMonth ? "text-gray-900" : "text-gray-200"
+                isSameDay(day, new Date()) ? "text-primary bg-primary/10 w-5 h-5 flex items-center justify-center rounded-full" : isCurrentMonth ? "text-slate-300" : "text-slate-600"
               )}>
                 {format(day, 'd')}
               </span>
@@ -108,7 +108,7 @@ export default function FinancialCalendar() {
                     key={t.id} 
                     className={cn(
                       "text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 truncate",
-                      t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                      t.type === 'income' ? "bg-emerald-500/10 text-emerald-500" : "bg-orange-500/10 text-orange-500"
                     )}
                   >
                     {t.type === 'income' ? <ArrowUpRight className="w-2 h-2" /> : <ArrowDownRight className="w-2 h-2" />}
@@ -116,13 +116,13 @@ export default function FinancialCalendar() {
                   </div>
                 ))}
                 {dayDebts.slice(0, 1).map((d) => (
-                  <div key={d.id} className="text-[8px] font-bold px-1 py-0.5 rounded bg-red-50 text-red-600 flex items-center gap-0.5 truncate">
+                  <div key={d.id} className="text-[8px] font-bold px-1 py-0.5 rounded bg-red-500/10 text-red-500 flex items-center gap-0.5 truncate">
                     <CreditCard className="w-2 h-2" />
                     {d.title}
                   </div>
                 ))}
                 {dayTransactions.length + dayDebts.length > 3 && (
-                  <span className="text-[7px] text-gray-300 font-bold px-1">+{dayTransactions.length + dayDebts.length - 3} mais</span>
+                  <span className="text-[7px] text-slate-500 font-bold px-1">+{dayTransactions.length + dayDebts.length - 3} mais</span>
                 )}
               </div>
             </div>
@@ -136,51 +136,51 @@ export default function FinancialCalendar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="border-t border-[#E2E8F0] bg-slate-50 overflow-hidden"
+            className="border-t border-slate-800 bg-slate-800/30 overflow-hidden"
           >
             <div className="p-6">
                <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                    <Calendar className="w-5 h-5 text-primary" />
                    Lançamentos do dia {format(selectedDay, "dd 'de' MMMM", { locale: ptBR })}
                  </h3>
-                 <button onClick={() => setSelectedDay(null)} className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-white rounded-lg shadow-sm border border-slate-200">
+                 <button onClick={() => setSelectedDay(null)} className="text-slate-400 hover:text-white text-xs font-bold uppercase tracking-widest px-3 py-1 bg-slate-800 rounded-lg shadow-sm border border-slate-700 transition-colors">
                    Fechar
                  </button>
                </div>
 
                {getDayTransactions(selectedDay).length === 0 && getDayDebts(selectedDay).length === 0 ? (
-                 <p className="text-sm font-medium text-slate-400 text-center py-6">Nenhuma movimentação neste dia.</p>
+                 <p className="text-sm font-medium text-slate-500 text-center py-6">Nenhuma movimentação neste dia.</p>
                ) : (
-                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                    {getDayTransactions(selectedDay).map(t => (
-                     <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                     <div key={t.id} className="bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-700 flex items-center justify-between hover:bg-slate-700/50 transition-colors">
                        <div className="flex items-center gap-4">
-                         <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", t.type === 'income' ? 'bg-emerald-50 text-emerald-500' : 'bg-orange-50 text-orange-500')}>
+                         <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", t.type === 'income' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500')}>
                            {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
                          </div>
                          <div>
-                           <p className="font-bold text-slate-800">{t.description}</p>
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{format(new Date(t.date), "HH:mm")} • {t.category}</p>
+                           <p className="font-bold text-white">{t.description}</p>
+                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{format(new Date(t.date), "HH:mm")} • {t.category}</p>
                          </div>
                        </div>
-                       <p className={cn("font-bold", t.type === 'income' ? 'text-emerald-500' : 'text-orange-500')}>
+                       <p className={cn("font-bold text-lg", t.type === 'income' ? 'text-emerald-500' : 'text-orange-500')}>
                          {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                        </p>
                      </div>
                    ))}
                    {getDayDebts(selectedDay).map(d => (
-                     <div key={d.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between opacity-75">
+                     <div key={d.id} className="bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-700 flex items-center justify-between opacity-75 hover:bg-slate-700/50 transition-colors">
                        <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-50 text-red-500">
+                         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500">
                            <CreditCard className="w-5 h-5" />
                          </div>
                          <div>
-                           <p className="font-bold text-slate-800">Dívida/Fatura: {d.title}</p>
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Parcela {d.paidInstallments}/{d.totalInstallments}</p>
+                           <p className="font-bold text-white">Dívida/Fatura: {d.title}</p>
+                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Parcela {d.paidInstallments}/{d.totalInstallments}</p>
                          </div>
                        </div>
-                       <p className="font-bold text-red-500">
+                       <p className="font-bold text-red-500 text-lg">
                          {formatCurrency(d.monthlyPayment)}
                        </p>
                      </div>

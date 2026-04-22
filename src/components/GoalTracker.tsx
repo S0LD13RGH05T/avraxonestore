@@ -81,7 +81,7 @@ function GoalCard({ goal, onDelete, onUpdate }: { goal: Goal, onDelete: () => vo
   return (
     <motion.div 
       whileHover={{ y: -5 }}
-      className="bg-slate-900 p-7 rounded-[2rem] border border-slate-800 shadow-sm relative overflow-hidden group"
+      className="bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-800 shadow-sm relative overflow-hidden group flex flex-col justify-between"
     >
       <div className="absolute top-4 right-4 flex gap-2 transition-opacity">
          <button 
@@ -108,34 +108,34 @@ function GoalCard({ goal, onDelete, onUpdate }: { goal: Goal, onDelete: () => vo
         </div>
       )}
       
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between items-start mb-6 sm:mb-8 gap-4">
         <div className={cn(
-          "w-14 h-14 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110", 
+          "w-12 h-12 md:w-14 md:h-14 flex-shrink-0 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110", 
           categoryInfo.color
         )}>
-          <CategoryIcon className="w-7 h-7" />
+          <CategoryIcon className="w-6 h-6 md:w-7 md:h-7" />
         </div>
-        <div className="text-right pr-8 group-hover:pr-16 transition-all">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 flex items-center justify-end gap-1.5">
+        <div className="text-left sm:text-right pr-2 sm:pr-8 sm:group-hover:pr-12 transition-all">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 flex items-center justify-start sm:justify-end gap-1.5">
             <Clock className="w-3 h-3" /> DATA ALVO
           </p>
-          <div className="text-sm font-bold text-white">
+          <div className="text-sm md:text-base font-bold bg-slate-800 px-3 py-1.5 rounded-lg text-white inline-block">
             {formatDate(goal.deadline)}
           </div>
         </div>
       </div>
 
-      <div className="mb-2">
+      <div className="mb-4 sm:mb-2">
         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
           {categoryInfo.label}
         </span>
-        <h4 className="text-xl font-bold text-white truncate mb-1">{goal.title}</h4>
+        <h4 className="text-xl md:text-2xl font-bold text-white break-words leading-tight">{goal.title}</h4>
       </div>
 
       {!isUpdating ? (
-        <div className="flex items-end gap-2 mb-6 cursor-pointer" onClick={() => setIsUpdating(true)}>
-          <span className="text-2xl font-black text-white">{formatCurrency(goal.currentAmount)}</span>
-          <span className="text-xs font-bold text-slate-500 mb-1.5">/ {formatCurrency(goal.targetAmount)}</span>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-1 sm:gap-2 mb-6 sm:mb-8 cursor-pointer group-hover:bg-slate-800/30 p-2 -mx-2 rounded-xl transition-colors" onClick={() => setIsUpdating(true)}>
+          <span className="text-2xl md:text-3xl font-black text-white">{formatCurrency(goal.currentAmount)}</span>
+          <span className="text-xs font-bold text-slate-500 mb-1.5 sm:mb-2">/ {formatCurrency(goal.targetAmount)}</span>
         </div>
       ) : (
         <div className="mb-6 flex gap-2">
