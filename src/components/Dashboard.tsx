@@ -679,7 +679,7 @@ export default function Dashboard() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="space-y-6"
             >
-              <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-sm">
+              <div className="bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-800 shadow-sm">
                  <div className="flex items-center justify-between mb-8">
                     <div>
                        <h2 className="text-xl font-black text-white uppercase">Configurações & Sócio</h2>
@@ -838,7 +838,7 @@ export default function Dashboard() {
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800"
+                className="bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative overflow-hidden border border-slate-800"
                 onClick={e => e.stopPropagation()}
               >
                  <div className="flex items-center justify-between mb-8">
@@ -968,7 +968,7 @@ function TransactionModal({
       amount: parseFloat(amount),
       description,
       category,
-      goalId: goalId || undefined,
+      goalId: goalId || null,
       date: new Date().toISOString()
     });
     onClose();
@@ -986,7 +986,7 @@ function TransactionModal({
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
-        className="bg-slate-900 w-full max-w-md rounded-[2.5rem] border border-slate-800 p-8 shadow-2xl"
+        className="bg-slate-900 w-full max-w-md rounded-[2.5rem] border border-slate-800 p-6 md:p-8 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-8">
@@ -1030,14 +1030,14 @@ function TransactionModal({
 
            <div>
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Categoria</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                  {categories.map(cat => (
                    <button
                      key={cat}
                      type="button"
                      onClick={() => setCategory(cat)}
                      className={cn(
-                       "py-3 rounded-xl text-xs font-bold transition-all border",
+                       "py-2 px-2 rounded-xl text-[10px] md:text-xs font-bold transition-all border break-words",
                        category === cat 
                          ? (type === 'income' ? "bg-emerald-500 text-white border-emerald-500" : "bg-accent text-white border-accent")
                          : "bg-slate-800 text-slate-400 border-slate-700 hover:border-primary/30"

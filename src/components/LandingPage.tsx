@@ -47,7 +47,7 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="pt-40 pb-20 px-6 overflow-hidden">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
@@ -57,10 +57,10 @@ export default function LandingPage() {
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Controle em tempo real</span>
             </div>
-            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-[0.85] mb-8">
+            <h1 className="text-5xl sm:text-6xl md:text-8xl font-bold tracking-tighter leading-[0.95] md:leading-[0.85] mb-6 md:mb-8 break-words">
               O futuro do seu dinheiro <span className="text-primary italic">sob controle.</span>
             </h1>
-            <p className="text-xl text-gray-500 mb-10 max-w-lg leading-relaxed">
+            <p className="text-lg md:text-xl text-gray-500 mb-8 md:mb-10 max-w-lg leading-relaxed">
               O controle financeiro projetado para quem quer sair das dívidas, bater metas e construir um patrimônio sólido.
             </p>
             
@@ -151,7 +151,7 @@ export default function LandingPage() {
       <section id="security" className="py-32 bg-white">
          <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-20">
             <div className="flex-1 space-y-8">
-               <h2 className="text-5xl font-bold tracking-tight">Segurança bancária para <span className="text-accent underline decoration-4 underline-offset-8">sua paz.</span></h2>
+               <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Segurança bancária para <span className="text-accent underline decoration-4 underline-offset-8 break-words">sua paz.</span></h2>
                <div className="space-y-6">
                   <SecurityItem title="Auth via Google" description="Utilizamos a infraestrutura do Google para garantir que só você acesse seus dados." />
                   <SecurityItem title="Sem Acesso à Conta" description="Nós nunca pedimos senhas de banco. Você apenas registra seus movimentos de forma manual e inteligente." />
@@ -172,7 +172,7 @@ export default function LandingPage() {
       {/* Final CTA */}
       <section className="py-32 bg-gray-50">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-5xl md:text-7xl font-bold tracking-tighter mb-8 italic">Prontos para <br/>o próximo nível?</h2>
+          <h2 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tighter mb-6 md:mb-8 italic">Prontos para <br/>o próximo nível?</h2>
           <p className="text-xl text-gray-500 mb-12 font-medium">Cadastre-se agora e receba acesso vitalício ao painel financeiro.</p>
           <button 
             onClick={signIn}
