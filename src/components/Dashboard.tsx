@@ -361,7 +361,7 @@ export default function Dashboard() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter">FINANÇAS DO CASAL</h2>
+                  <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter">VISÃO GERAL</h2>
                   <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest">{months[currentMonth]} • {currentYear}</p>
                 </div>
                 {/* ... existing filters ... */}
@@ -624,7 +624,7 @@ export default function Dashboard() {
 
                    <div className="bg-primary rounded-2xl p-5 text-white shadow-xl shadow-primary/20">
                       <h3 className="font-bold mb-2 flex items-center gap-2 text-sm">
-                        <Zap className="w-4 h-4" /> Insight do Casal
+                        <Zap className="w-4 h-4" /> Insight Financeiro
                       </h3>
                       <p className="text-xs leading-relaxed opacity-90">
                         Vocês estão fazendo um ótimo trabalho! Manter o equilíbrio geométrico entre as receitas e despesas é a chave para o sucesso.
@@ -758,7 +758,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-left">
                                      <p className="font-bold text-white text-sm">{finance.partner.displayName}</p>
-                                     <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Parceiro Conectado</p>
+                                     <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Membro Conectado</p>
                                   </div>
                                </div>
                              ) : (
@@ -823,7 +823,7 @@ export default function Dashboard() {
                 </div>
                 
                 <p className="text-xs text-slate-500 font-medium leading-relaxed italic border-l-2 border-primary/20 pl-4 py-2">
-                   Envie o código para seu parceiro. Assim que ele entrar, vocês verão os gastos um do outro em tempo real.
+                   Envie o código para seu sócio ou parceiro de negócios. Assim que ele entrar, vocês verão as finanças do workspace em tempo real.
                 </p>
              </motion.div>
           </div>

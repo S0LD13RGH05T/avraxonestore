@@ -1,6 +1,6 @@
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'motion/react';
-import { Wallet, Heart, ArrowRight } from 'lucide-react';
+import { Wallet, Infinity as InfinityIcon, ArrowRight } from 'lucide-react';
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
@@ -18,14 +18,14 @@ export default function AuthScreen() {
               <Wallet className="w-8 h-8 text-primary" />
             </div>
             <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-accent rounded-full flex items-center justify-center border-4 border-white">
-              <Heart className="w-4 h-4 text-white" />
+              <InfinityIcon className="w-4 h-4 text-white" />
             </div>
           </div>
         </div>
         
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Amor & Finanças</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Avrax One</h1>
         <p className="text-gray-500 mb-8">
-          O controle financeiro feito para quem constrói o futuro em dupla.
+          O controle financeiro definitivo para você ou seu negócio.
         </p>
 
         <button

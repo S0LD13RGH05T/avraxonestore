@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'motion/react';
 import { 
-  Heart, 
+  Infinity as InfinityIcon, 
   Wallet, 
   ShieldCheck, 
   Zap, 
@@ -25,9 +25,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-              <Heart className="w-4 h-4 text-white fill-white" />
+              <InfinityIcon className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight">Amor & Finanças</span>
+            <span className="font-bold text-xl tracking-tight">Avrax One</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8 px-8">
@@ -58,10 +58,10 @@ export default function LandingPage() {
               <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Controle em tempo real</span>
             </div>
             <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-[0.85] mb-8">
-              O futuro se reconstrói <span className="text-primary italic">em dupla.</span>
+              O futuro do seu dinheiro <span className="text-primary italic">sob controle.</span>
             </h1>
             <p className="text-xl text-gray-500 mb-10 max-w-lg leading-relaxed">
-              O controle financeiro compartilhado para casais que querem sair das dívidas, bater metas e construir um patrimônio juntos.
+              O controle financeiro projetado para quem quer sair das dívidas, bater metas e construir um patrimônio sólido.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -76,7 +76,7 @@ export default function LandingPage() {
                 {[1, 2, 3, 4].map(i => (
                   <img key={i} src={`https://picsum.photos/seed/user${i}/100/100`} alt="Avatar" className="w-10 h-10 rounded-full border-4 border-white object-cover shadow-sm" referrerPolicy="no-referrer" />
                 ))}
-                <span className="pl-6 text-sm font-bold text-gray-400">+500 casais ativos</span>
+                <span className="pl-6 text-sm font-bold text-gray-400">+500 usuários ativos</span>
               </div>
             </div>
           </motion.div>
@@ -136,12 +136,12 @@ export default function LandingPage() {
             <FeatureCard 
               icon={<ShieldCheck className="w-6 h-6 text-purple-500" />}
               title="Privacidade Total"
-              description="Dados criptografados e acesso restrito apenas ao casal via convite seguro."
+              description="Dados criptografados e acesso restrito apenas aos membros do workspace via convite seguro."
             />
             <FeatureCard 
               icon={<Users className="w-6 h-6 text-pink-500" />}
-              title="Perfis Individuais"
-              description="Saiba quem gastou o quê sem perder a visão do patrimônio total da família."
+              title="Múltiplos Perfis"
+              description="Saiba quem gastou o quê sem perder a visão do patrimônio total."
             />
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function LandingPage() {
       <section className="py-32 bg-gray-50">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-5xl md:text-7xl font-bold tracking-tighter mb-8 italic">Prontos para <br/>o próximo nível?</h2>
-          <p className="text-xl text-gray-500 mb-12 font-medium">Cadastre-se agora e receba acesso vitalício ao painel compartilhado.</p>
+          <p className="text-xl text-gray-500 mb-12 font-medium">Cadastre-se agora e receba acesso vitalício ao painel financeiro.</p>
           <button 
             onClick={signIn}
             className="bg-primary text-white px-12 py-6 rounded-[2.5rem] text-2xl font-black shadow-2xl shadow-primary/40 hover:scale-105 active:scale-95 transition-all"
@@ -187,10 +187,10 @@ export default function LandingPage() {
       <footer className="py-20 border-t border-gray-100 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-primary" />
-            <span className="font-bold">Amor & Finanças</span>
+            <InfinityIcon className="w-5 h-5 text-primary" />
+            <span className="font-bold">Avrax One</span>
           </div>
-          <p className="text-sm font-medium text-gray-400 italic">Uma parceria para toda a vida.</p>
+          <p className="text-sm font-medium text-gray-400 italic">Uma parceria para o seu negócio.</p>
           <p className="text-xs text-gray-400">© 2026 Todos os direitos reservados.</p>
         </div>
       </footer>

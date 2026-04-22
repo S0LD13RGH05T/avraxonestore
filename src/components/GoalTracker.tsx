@@ -48,7 +48,7 @@ export default function GoalTracker() {
               <Target className="w-10 h-10 text-slate-600" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Sem metas no momento</h3>
-            <p className="text-slate-500 font-medium max-w-xs mx-auto">Crie sua primeira meta para começar a poupar em dupla e conquistar grandes coisas!</p>
+            <p className="text-slate-500 font-medium max-w-xs mx-auto">Crie sua primeira meta para começar a poupar e conquistar grandes coisas!</p>
           </div>
         )}
       </div>
@@ -304,7 +304,7 @@ function AddGoalModal({ onClose, onAdd }: { onClose: () => void, onAdd: (g: any)
           >
             {isSubmitting ? 'Salvando...' : (
               <>
-                <Trophy className="w-5 h-5" /> CRIAR META EM DUPLA
+                <Trophy className="w-5 h-5" /> CRIAR NOVA META
               </>
             )}
           </button>

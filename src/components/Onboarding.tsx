@@ -128,9 +128,9 @@ export default function Onboarding() {
           <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mb-6">
             <Users className="w-8 h-8 text-slate-400" />
           </div>
-          <h2 className="text-2xl font-bold mb-3 tracking-tight text-slate-600">Unir com Parceiro</h2>
+          <h2 className="text-2xl font-bold mb-3 tracking-tight text-slate-600">Entrar em Workspace</h2>
           <p className="text-slate-400 text-sm mb-10 leading-relaxed">
-            Convite estático: insira o código compartilhado pelo seu sócio ou parceiro.
+            Convite estático: insira o código compartilhado pelo criador do Workspace.
           </p>
           
           <div className="w-full space-y-4">
