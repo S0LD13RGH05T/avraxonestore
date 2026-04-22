@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getCouple(coupleId) {
+      return get(/databases/$(database)/documents/couples/$(coupleId)).data;
+    }
+
+    function isMemberOfCouple(coupleId) {
+      let couple = getCouple(coupleId);
+      return isSignedIn() && (couple.partner1 == request.auth.uid || couple.partner2 == request.auth.uid);
+    }
+
+    // User Profile
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid == request.auth.uid &&
+               (data.email == null || data.email is string) && (data.email.size() <= 256 || data.email == null);
+      }
+
+      allow get: if isSignedIn(); // Allow searching for partners
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'currentCoupleId', 'workspaceIds', 'balance', 'role', 'photoURL', 'email', 'themeColor']);
+    }
+
+    // Couple/Space Document
+    match /couples/{coupleId} {
+      function isValidCouple(data) {
+        return data.partner1 is string &&
+               (data.partner2 == null || data.partner2 is string) &&
+               (data.type == null || data.type in ['Personal', 'Business']) &&
+               (data.name == null || data.name is string) &&
+               data.createdAt is string;
+      }
+
+      allow get: if isSignedIn(); // Allow partners to fetch couple by ID/inviteCode
+      allow create: if isSignedIn() && incoming().partner1 == request.auth.uid && isValidCouple(incoming());
+      allow update: if isMemberOfCouple(coupleId) && isValidCouple(incoming()) &&
+                    (
+                      // Action: Join
+                      (existing().partner2 == null && incoming().partner2 == request.auth.uid && 
+                       incoming().diff(existing()).affectedKeys().hasOnly(['partner2'])) ||
+                      // Other updates
+                      (incoming().partner1 == existing().partner1 &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['partner2', 'inviteCode']))
+                    );
+    }
+
+    // Transactions
+    match /couples/{coupleId}/transactions/{transactionId} {
+      function isValidTransaction(data) {
+        return data.userId == request.auth.uid &&
+               data.coupleId == coupleId &&
+               data.type in ['income', 'expense'] &&
+               data.amount is number && data.amount >= 0 &&
+               data.date is string;
+      }
+
+      allow list, get: if isMemberOfCouple(coupleId);
+      allow create: if isMemberOfCouple(coupleId) && isValidTransaction(incoming());
+      allow update: if isMemberOfCouple(coupleId) && isValidTransaction(incoming()) && 
+                    incoming().userId == existing().userId;
+      allow delete: if isMemberOfCouple(coupleId) && existing().userId == request.auth.uid;
+    }
+
+    // Debts
+    match /couples/{coupleId}/debts/{debtId} {
+      function isValidDebt(data) {
+        return data.coupleId == coupleId &&
+               data.title is string && data.title.size() <= 100 &&
+               data.totalAmount is number &&
+               data.remainingAmount is number &&
+               data.status in ['active', 'paid'];
+      }
+
+      allow list, get: if isMemberOfCouple(coupleId);
+      allow create: if isMemberOfCouple(coupleId) && isValidDebt(incoming());
+      allow update: if isMemberOfCouple(coupleId) && isValidDebt(incoming());
+      allow delete: if isMemberOfCouple(coupleId);
+    }
+
+    // Goals
+    match /couples/{coupleId}/goals/{goalId} {
+      function isValidGoal(data) {
+        return data.coupleId == coupleId &&
+               data.title is string && data.title.size() <= 100 &&
+               data.category is string && data.category.size() <= 64 &&
+               data.targetAmount is number &&
+               data.currentAmount is number &&
+               data.status in ['in_progress', 'completed'];
+      }
+
+      allow list, get: if isMemberOfCouple(coupleId);
+      allow create: if isMemberOfCouple(coupleId) && isValidGoal(incoming());
+      allow update: if isMemberOfCouple(coupleId) && isValidGoal(incoming());
+      allow delete: if isMemberOfCouple(coupleId);
+    }
+
+    // Logs
+    match /couples/{coupleId}/logs/{logId} {
+      function isValidLog(data) {
+        return data.userId == request.auth.uid &&
+               data.coupleId == coupleId &&
+               data.action is string &&
+               data.timestamp is string;
+      }
+
+      allow list, get: if isMemberOfCouple(coupleId);
+      allow create: if isMemberOfCouple(coupleId) && isValidLog(incoming());
+      // Logs should be immutable
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and individual settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "coupleId": { "type": "string" },
+        "balance": { "type": "number" },
+        "role": { "type": "string", "enum": ["partner1", "partner2"] }
+      },
+      "required": ["uid", "email"]
+    },
+    "Couple": {
+      "title": "Couple",
+      "description": "Shared entity connecting two users",
+      "type": "object",
+      "properties": {
+        "partner1": { "type": "string" },
+        "partner2": { "type": "string" },
+        "inviteCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["partner1", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "coupleId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "coupleId", "type", "amount", "date"]
+    },
+    "Debt": {
+      "title": "Debt",
+      "description": "Debt or long-term liability",
+      "type": "object",
+      "properties": {
+        "coupleId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "installments": { "type": "number" },
+        "interest": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "paid"] },
+        "monthlyPayment": { "type": "number" }
+      },
+      "required": ["coupleId", "title", "totalAmount", "remainingAmount", "status"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Financial goal",
+      "type": "object",
+      "properties": {
+        "coupleId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["in_progress", "completed"] }
+      },
+      "required": ["coupleId", "title", "targetAmount", "currentAmount", "status"]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "Action history",
+      "type": "object",
+      "properties": {
+        "coupleId": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["coupleId", "userId", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles"
+    },
+    "/couples/{coupleId}": {
+      "schema": "Couple",
+      "description": "Stores shared couple data"
+    },
+    "/couples/{coupleId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Stores couple transactions"
+    },
+    "/couples/{coupleId}/debts/{debtId}": {
+      "schema": "Debt",
+      "description": "Stores couple debts"
+    },
+    "/couples/{coupleId}/goals/{goalId}": {
+      "schema": "Goal",
+      "description": "Stores couple goals"
+    },
+    "/couples/{coupleId}/logs/{logId}": {
+      "schema": "Log",
+      "description": "Stores couple activity logs"
+    }
+  }
+}
