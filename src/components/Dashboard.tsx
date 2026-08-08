@@ -15,6 +15,7 @@ import DebtManagement from './DebtManagement';
 import GoalTracker from './GoalTracker';
 import QuickActionModal from './QuickActionModal';
 import GlobalSearchModal from './GlobalSearchModal';
+import TeamManagement from './TeamManagement';
 
 // Icons
 import { 
@@ -737,20 +738,24 @@ export default function Dashboard() {
 
           {/* 11. CONFIGURAÇÕES */}
           {activeTab === 'settings' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div>
                 <h2 className="text-2xl font-black text-white tracking-tight uppercase">Configurações</h2>
-                <p className="text-xs text-zinc-400">Preferências da conta e configurações do espaço financeiro</p>
+                <p className="text-xs text-zinc-400">Preferências da conta, compartilhamento de espaço e gestão de equipe</p>
               </div>
 
+              {/* Equipe e Compartilhamento */}
+              <TeamManagement />
+
               <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-6 max-w-xl shadow-xl">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Dados do Espaço</h3>
                 <div>
-                  <label className="block text-xs font-bold text-white mb-1">Nome do Espaço</label>
+                  <label className="block text-xs font-bold text-zinc-400 mb-1">Nome do Espaço</label>
                   <p className="text-sm font-bold text-emerald-400">{finance.coupleData?.name || 'Espaço Principal'}</p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-white mb-1">E-mail Cadastrado</label>
+                  <label className="block text-xs font-bold text-zinc-400 mb-1">E-mail Cadastrado</label>
                   <p className="text-sm text-zinc-300">{profile?.email}</p>
                 </div>
 

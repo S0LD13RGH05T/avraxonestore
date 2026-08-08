@@ -2,20 +2,18 @@ import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'motion/react';
 import { 
-  Wallet, 
-  ShieldCheck, 
-  Zap, 
-  Users, 
   ArrowRight, 
-  CheckCircle2,
-  CalendarDays,
-  CreditCard,
-  BarChart3,
-  TrendingUp,
-  LayoutDashboard
+  CreditCard, 
+  Users, 
+  LayoutDashboard,
+  KeyRound
 } from 'lucide-react';
 
-export default function LandingPage() {
+interface LandingPageProps {
+  onOpenCodeModal?: () => void;
+}
+
+export default function LandingPage({ onOpenCodeModal }: LandingPageProps) {
   const { signIn } = useAuth();
 
   return (
@@ -30,12 +28,22 @@ export default function LandingPage() {
             <span className="font-extrabold text-lg text-white tracking-tight uppercase">Avrax Finance</span>
           </div>
 
-          <button 
-            onClick={signIn}
-            className="bg-emerald-400 text-black px-5 py-2 rounded-xl text-xs font-extrabold shadow-lg shadow-emerald-500/20 hover:bg-emerald-300 transition-all transform active:scale-95"
-          >
-            Acessar Sistema
-          </button>
+          <div className="flex items-center gap-3">
+            {onOpenCodeModal && (
+              <button
+                onClick={onOpenCodeModal}
+                className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 hover:text-emerald-400 font-bold transition-colors px-3 py-2"
+              >
+                <KeyRound className="w-3.5 h-3.5" /> Possui um código?
+              </button>
+            )}
+            <button 
+              onClick={signIn}
+              className="bg-emerald-400 text-black px-5 py-2 rounded-xl text-xs font-extrabold shadow-lg shadow-emerald-500/20 hover:bg-emerald-300 transition-all transform active:scale-95"
+            >
+              Acessar Sistema
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -65,6 +73,15 @@ export default function LandingPage() {
               >
                 Entrar com Google <ArrowRight className="w-4 h-4" />
               </button>
+
+              {onOpenCodeModal && (
+                <button
+                  onClick={onOpenCodeModal}
+                  className="px-6 py-3.5 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
+                >
+                  <KeyRound className="w-4 h-4 text-amber-400" /> Inserir código de convite
+                </button>
+              )}
             </div>
           </motion.div>
 

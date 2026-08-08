@@ -3,9 +3,13 @@ import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/firebase';
 import { doc, setDoc, query, collection, where, getDocs, updateDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { Users, UserPlus, ArrowRight, Check, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Users, UserPlus, ArrowRight, Check, AlertCircle, ArrowLeft, KeyRound } from 'lucide-react';
 
-export default function Onboarding() {
+interface OnboardingProps {
+  onOpenCodeModal?: () => void;
+}
+
+export default function Onboarding({ onOpenCodeModal }: OnboardingProps) {
   const { user, updateProfile, logout } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,11 @@ export default function Onboarding() {
     setLoading(true);
     setError('');
     try {
+      if (onOpenCodeModal && inviteCode.length === 4) {
+        onOpenCodeModal();
+        return;
+      }
+
       const couplesRef = collection(db, 'couples');
       const q = query(couplesRef, where('inviteCode', '==', inviteCode.toUpperCase()));
       const querySnapshot = await getDocs(q);
@@ -127,13 +136,14 @@ export default function Onboarding() {
           </div>
           <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Entrar com Convite</h2>
           <p className="text-zinc-400 text-xs mb-8 leading-relaxed">
-            Insira o código de convite recebido para se conectar a um espaço existente.
+            Insira o código de convite de 4 dígitos recebido para se conectar a um espaço existente.
           </p>
           
           <div className="w-full space-y-3">
             <input
               type="text"
-              placeholder="CÓDIGO"
+              placeholder="CÓDIGO (4 DÍGITOS)"
+              maxLength={6}
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-center font-mono text-lg tracking-widest text-white focus:outline-none focus:border-emerald-500 transition-all"
