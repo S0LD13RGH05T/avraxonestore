@@ -16,6 +16,7 @@ import GoalTracker from './GoalTracker';
 import QuickActionModal from './QuickActionModal';
 import GlobalSearchModal from './GlobalSearchModal';
 import TeamManagement from './TeamManagement';
+import MobileBottomNav from './MobileBottomNav';
 
 // Icons
 import { 
@@ -416,7 +417,7 @@ export default function Dashboard() {
         </header>
 
         {/* Dynamic Body Content */}
-        <div className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto space-y-8">
+        <div className="flex-1 p-4 lg:p-8 pb-28 lg:pb-8 max-w-7xl w-full mx-auto space-y-8">
           
           {/* 1. INÍCIO / DASHBOARD */}
           {activeTab === 'home' && (
@@ -785,6 +786,12 @@ export default function Dashboard() {
       <GlobalSearchModal
         isOpen={showSearchModal}
         onClose={() => setShowSearchModal(false)}
+      />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
     </div>
   );

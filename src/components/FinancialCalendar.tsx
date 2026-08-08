@@ -161,7 +161,7 @@ export default function FinancialCalendar() {
               key={day.toString()}
               onClick={() => setSelectedDay(day)}
               className={cn(
-                "min-h-[90px] p-2 border-r border-b border-zinc-800/80 flex flex-col justify-between transition-all cursor-pointer group hover:bg-zinc-900/50",
+                "min-h-[65px] sm:min-h-[90px] p-1 sm:p-2 border-r border-b border-zinc-800/80 flex flex-col justify-between transition-all cursor-pointer group hover:bg-zinc-900/50",
                 !isCurrentMonth && "opacity-30 bg-zinc-950/40",
                 i % 7 === 6 && "border-r-0",
                 isSelected && "bg-emerald-500/5 ring-1 ring-emerald-500/30"

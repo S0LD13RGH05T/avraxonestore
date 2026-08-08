@@ -166,7 +166,7 @@ export default function AccountsAndCards() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex overflow-x-auto snap-x snap-mandatory pb-4 custom-scrollbar gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3">
           {finance.creditCards.map((card) => {
             const available = card.limit - (card.balance || 0);
             const usagePercentage = Math.min(100, Math.round(((card.balance || 0) / card.limit) * 100));
@@ -174,7 +174,7 @@ export default function AccountsAndCards() {
             return (
               <div 
                 key={card.id}
-                className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-zinc-800 p-6 rounded-3xl text-white relative overflow-hidden shadow-2xl group hover:border-zinc-700 transition-all"
+                className="snap-center min-w-[280px] sm:min-w-0 flex-1 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-zinc-800 p-6 rounded-3xl text-white relative overflow-hidden shadow-2xl group hover:border-zinc-700 transition-all"
               >
                 {/* Visual Card Accent Line */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-cyan-500" />
