@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/firebase';
-import { doc, setDoc, query, collection, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, query, collection, where, getDocs, updateDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { Users, UserPlus, ArrowRight, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export default function Onboarding() {
-  const { user, profile, updateProfile, logout } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +23,7 @@ export default function Onboarding() {
         partner1: user.uid,
         partner2: null,
         inviteCode: newInviteCode,
-        type, // Guardar o tipo (Pessoal ou Empresarial)
+        type,
         name: type === 'Personal' ? 'Finanças Pessoais' : 'Finanças Empresariais',
         createdAt: new Date().toISOString(),
       });
@@ -71,20 +71,19 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4 relative">
-      {/* Back Button */}
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col items-center justify-center p-4 relative">
       <button 
         onClick={() => logout()}
-        className="absolute top-8 left-8 flex items-center gap-2 text-slate-400 hover:text-slate-600 font-bold text-sm transition-all"
+        className="absolute top-8 left-8 flex items-center gap-2 text-zinc-500 hover:text-white font-bold text-xs transition-all"
       >
-        <ArrowLeft className="w-4 h-4" /> Sair e Voltar ao Início
+        <ArrowLeft className="w-4 h-4" /> Sair
       </button>
 
       {error && (
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-bold flex items-center gap-3 max-w-4xl w-full"
+          className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl text-xs font-bold flex items-center gap-3 max-w-4xl w-full"
         >
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           {error}
@@ -96,57 +95,55 @@ export default function Onboarding() {
         animate={{ opacity: 1, scale: 1 }}
         className="max-w-4xl w-full grid md:grid-cols-2 gap-8"
       >
-        {/* Workspace Creation Options */}
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-[#E2E8F0] flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
-            <UserPlus className="w-8 h-8 text-primary" />
+        <div className="bg-zinc-950 p-8 rounded-3xl border border-zinc-800 flex flex-col items-center text-center shadow-2xl">
+          <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mb-6 text-emerald-400">
+            <UserPlus className="w-7 h-7" />
           </div>
-          <h2 className="text-2xl font-bold mb-3 tracking-tight">Criar Novo Perfil</h2>
-          <p className="text-slate-500 text-sm mb-10 leading-relaxed">
-            Comece um controle financeiro Pessoal ou Empresarial isolado.
+          <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Criar Espaço Financeiro</h2>
+          <p className="text-zinc-400 text-xs mb-8 leading-relaxed">
+            Inicie um controle financeiro completo Pessoal ou de Gestão do seu negócio.
           </p>
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-3">
             <button
               onClick={() => createCouple('Personal')}
               disabled={loading}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              className="w-full bg-emerald-400 text-black py-3.5 rounded-2xl font-bold text-xs hover:bg-emerald-300 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
             >
-              Ponto Pessoal <ArrowRight className="w-4 h-4" />
+              Finanças Pessoais <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => createCouple('Business')}
               disabled={loading}
-              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+              className="w-full bg-zinc-900 text-white py-3.5 rounded-2xl font-bold text-xs border border-zinc-800 hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
             >
-              Controle Empresarial <ArrowRight className="w-4 h-4" />
+              Gestão de Negócio <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Join Option - More Muted/Gray */}
-        <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200 flex flex-col items-center text-center opacity-80">
-          <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mb-6">
-            <Users className="w-8 h-8 text-slate-400" />
+        <div className="bg-zinc-950 p-8 rounded-3xl border border-zinc-800 flex flex-col items-center text-center shadow-2xl">
+          <div className="w-14 h-14 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center mb-6 text-zinc-400">
+            <Users className="w-7 h-7" />
           </div>
-          <h2 className="text-2xl font-bold mb-3 tracking-tight text-slate-600">Entrar em Workspace</h2>
-          <p className="text-slate-400 text-sm mb-10 leading-relaxed">
-            Convite estático: insira o código compartilhado pelo criador do Workspace.
+          <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Entrar com Convite</h2>
+          <p className="text-zinc-400 text-xs mb-8 leading-relaxed">
+            Insira o código de convite recebido para se conectar a um espaço existente.
           </p>
           
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-3">
             <input
               type="text"
               placeholder="CÓDIGO"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl text-center font-mono text-xl tracking-widest text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all"
+              className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-center font-mono text-lg tracking-widest text-white focus:outline-none focus:border-emerald-500 transition-all"
             />
             <button
               onClick={joinCouple}
               disabled={loading || !inviteCode}
-              className="w-full bg-slate-300 text-white py-4 rounded-2xl font-bold hover:bg-slate-400 transition-all flex items-center justify-center gap-2"
+              className="w-full bg-zinc-900 text-white py-3.5 rounded-2xl font-bold text-xs border border-zinc-800 hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
             >
-              Unir Contas <Check className="w-4 h-4" />
+              Acessar Espaço <Check className="w-4 h-4" />
             </button>
           </div>
         </div>

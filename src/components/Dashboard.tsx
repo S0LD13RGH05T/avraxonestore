@@ -1,204 +1,318 @@
-import React, { useState } from 'react';
-import { useFinance, Transaction, Goal, Debt } from '../hooks/useFinance';
+import React, { useState, useMemo } from 'react';
+import { useFinance, Transaction } from '../hooks/useFinance';
 import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Subcomponents
+import FinancialCalendar from './FinancialCalendar';
+import AccountsAndCards from './AccountsAndCards';
+import ClientsManager from './ClientsManager';
+import InvestmentsManager from './InvestmentsManager';
+import TrafficManager from './TrafficManager';
+import ReportsManager from './ReportsManager';
 import DebtManagement from './DebtManagement';
 import GoalTracker from './GoalTracker';
-import FinancialCalendar from './FinancialCalendar';
+import QuickActionModal from './QuickActionModal';
+import GlobalSearchModal from './GlobalSearchModal';
+
+// Icons
 import { 
-  TrendingUp, 
-  TrendingDown, 
-  Wallet, 
-  Plus, 
-  Calendar, 
+  LayoutDashboard, 
+  ArrowLeftRight, 
   Target, 
-  AlertCircle,
-  LogOut,
-  Settings,
-  Bell,
-  ArrowUpRight,
-  ArrowDownRight,
-  Infinity as InfinityIcon,
-  CreditCard,
-  Flag,
-  Zap,
-  ChevronDown,
+  CalendarDays, 
+  TrendingUp, 
+  Zap, 
+  Users, 
+  CreditCard, 
+  BarChart3, 
+  History, 
+  Settings, 
+  Plus, 
+  Search, 
+  Bell, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  Wallet, 
+  Clock, 
+  LogOut, 
+  ChevronDown, 
+  Download, 
+  X, 
+  CircleAlert,
+  Landmark,
   Briefcase,
+  AlertTriangle,
   User as UserIcon,
-  Heart,
-  X,
-  Share2,
-  Trash2
+  CheckCircle2,
+  SlidersHorizontal
 } from 'lucide-react';
+
 import { 
-  LineChart, 
-  Line, 
+  BarChart, 
+  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer, 
+  LineChart, 
+  Line 
 } from 'recharts';
-type Tab = 'home' | 'debts' | 'goals' | 'calendar' | 'relationship';
+
+export type TabType = 
+  | 'home' 
+  | 'transactions' 
+  | 'goals' 
+  | 'calendar' 
+  | 'investments' 
+  | 'traffic' 
+  | 'clients' 
+  | 'debts' 
+  | 'reports' 
+  | 'history' 
+  | 'settings';
 
 export default function Dashboard() {
   const { profile, logout, switchWorkspace, updateProfile } = useAuth();
   const finance = useFinance();
-  const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [showAddModal, setShowAddModal] = useState<'income' | 'expense' | null>(null);
+
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickActionDefault, setQuickActionDefault] = useState<'income' | 'expense' | 'investment' | 'debt' | 'client' | 'goal' | 'commitment' | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+
+  // Transaction Ledger Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInviteAlert, setShowInviteAlert] = useState(() => {
-    return sessionStorage.getItem('invite_alert_dismissed') !== 'true';
-  });
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'income' | 'expense' | 'investment' | 'transfer'>('ALL');
 
-  const dismissInviteAlert = () => {
-    setShowInviteAlert(false);
-    sessionStorage.setItem('invite_alert_dismissed', 'true');
-  };
+  // Intelligent Alerts (Memoized)
+  const intelligentAlerts = useMemo(() => {
+    const alerts = [];
 
-  const [showInviteDrawer, setShowInviteDrawer] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [iconScale, setIconScale] = useState(1);
+    // Overdue or pending client payments
+    const pendingClients = finance.clients.filter(c => c.status === 'ATRASADO' || c.status === 'A RECEBER');
+    if (pendingClients.length > 0) {
+      alerts.push({
+        id: 'clients-alert',
+        title: 'Recebimentos Pendentes',
+        desc: `Você possui ${pendingClients.length} cliente(s) com cobranças a receber (${formatCurrency(finance.stats.totalReceivables)}).`,
+        type: 'warning'
+      });
+    }
 
-  const filteredTransactions = finance.transactions.filter(t => {
-    const d = new Date(t.date);
-    const matchesMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesMonth && matchesSearch;
-  });
+    // Debts near due date or delayed
+    const delayedDebts = finance.debts.filter(d => d.status === 'delayed');
+    if (delayedDebts.length > 0) {
+      alerts.push({
+        id: 'debts-alert',
+        title: 'Dívidas em Atraso',
+        desc: `Você possui ${delayedDebts.length} dívida(s) marcadas como atrasadas.`,
+        type: 'danger'
+      });
+    }
 
-  const balance = finance.transactions.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+    // Goals progress high
+    const closeGoals = finance.goals.filter(g => {
+      const p = (g.currentAmount / g.targetAmount) * 100;
+      return p >= 70 && p < 100;
+    });
+    if (closeGoals.length > 0) {
+      alerts.push({
+        id: 'goals-alert',
+        title: 'Meta Próxima do Alvo!',
+        desc: `O objetivo "${closeGoals[0].title}" está a mais de 70% concluído.`,
+        type: 'info'
+      });
+    }
 
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, t) => acc + t.amount, 0);
+    return alerts;
+  }, [finance.clients, finance.debts, finance.goals, finance.stats]);
 
-  const totalExpense = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => acc + t.amount, 0);
+  // Next Commitments (Sorted chronologically by date)
+  const nextCommitments = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const items: Array<{ id: string; title: string; date: string; amount: number; type: 'income' | 'expense' | 'debt' }> = [];
 
-  // Export CSV function
+    finance.debts
+      .filter(d => d.status === 'active' && d.dueDate)
+      .forEach(d => {
+        items.push({
+          id: d.id,
+          title: `Dívida: ${d.title}`,
+          date: d.dueDate || todayStr,
+          amount: d.monthlyPayment,
+          type: 'expense'
+        });
+      });
+
+    finance.clients
+      .filter(c => (c.status === 'A RECEBER' || c.status === 'PENDENTE') && c.paymentDate)
+      .forEach(c => {
+        items.push({
+          id: c.id,
+          title: `Cliente: ${c.name}`,
+          date: c.paymentDate,
+          amount: c.amount,
+          type: 'income'
+        });
+      });
+
+    finance.commitments
+      .filter(c => c.status === 'pending')
+      .forEach(c => {
+        items.push({
+          id: c.id,
+          title: c.title,
+          date: c.dueDate,
+          amount: c.amount,
+          type: c.type === 'income' ? 'income' : 'expense'
+        });
+      });
+
+    return items
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5);
+  }, [finance.debts, finance.clients, finance.commitments]);
+
+  // Filtered Transactions List for Ledger
+  const filteredTransactions = useMemo(() => {
+    return finance.transactions.filter(t => {
+      const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.category.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'ALL' || t.category === categoryFilter;
+      const matchesType = typeFilter === 'ALL' || t.type === typeFilter;
+      return matchesSearch && matchesCategory && matchesType;
+    });
+  }, [finance.transactions, searchTerm, categoryFilter, typeFilter]);
+
+  // Chart Data Evolution based on period
+  const evolutionChartData = useMemo(() => {
+    const pastDays = chartPeriod === 'week' ? 7 : chartPeriod === 'month' ? 30 : chartPeriod === 'quarter' ? 90 : 365;
+    const now = new Date();
+    
+    // Group transactions by date
+    const mapByDate: Record<string, { date: string; income: number; expense: number; investment: number }> = {};
+
+    for (let i = pastDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      mapByDate[dateKey] = { date: dateKey, income: 0, expense: 0, investment: 0 };
+    }
+
+    finance.transactions.forEach(t => {
+      const td = new Date(t.date);
+      const diffDays = Math.floor((now.getTime() - td.getTime()) / (1000 * 3600 * 24));
+      if (diffDays >= 0 && diffDays < pastDays) {
+        const dateKey = td.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        if (mapByDate[dateKey]) {
+          if (t.type === 'income') mapByDate[dateKey].income += t.amount;
+          if (t.type === 'expense') mapByDate[dateKey].expense += t.amount;
+          if (t.type === 'investment') mapByDate[dateKey].investment += t.amount;
+        }
+      }
+    });
+
+    const list = Object.values(mapByDate);
+    // If list is too long, downsample for performance
+    if (list.length > 30) {
+      return list.filter((_, idx) => idx % Math.ceil(list.length / 30) === 0);
+    }
+    return list;
+  }, [finance.transactions, chartPeriod]);
+
+  // Export CSV
   const exportToCSV = () => {
-    const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
+    const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor (R$)'];
     const rows = filteredTransactions.map(t => [
-      new Date(t.date).toLocaleDateString(),
+      new Date(t.date).toLocaleDateString('pt-BR'),
       t.description,
       t.category,
-      t.type === 'income' ? 'Entrada' : 'Saída',
+      t.type,
       t.amount.toString()
     ]);
-    
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `financeiro_${currentMonth + 1}_${currentYear}.csv`);
-    link.style.visibility = 'hidden';
+    link.href = URL.createObjectURL(blob);
+    link.download = `financeiro_extrato_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const months = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  const navItems = [
+    { id: 'home', label: 'INÍCIO', icon: LayoutDashboard },
+    { id: 'transactions', label: 'MOVIMENTAÇÕES', icon: ArrowLeftRight },
+    { id: 'goals', label: 'OBJETIVOS', icon: Target },
+    { id: 'calendar', label: 'CALENDÁRIO', icon: CalendarDays },
+    { id: 'investments', label: 'INVESTIMENTOS', icon: TrendingUp },
+    { id: 'traffic', label: 'TRÁFEGO', icon: Zap },
+    { id: 'clients', label: 'CLIENTES', icon: Users },
+    { id: 'debts', label: 'DÍVIDAS', icon: CircleAlert },
+    { id: 'reports', label: 'RELATÓRIOS', icon: BarChart3 },
+    { id: 'history', label: 'HISTÓRICO', icon: History },
+    { id: 'settings', label: 'CONFIGURAÇÕES', icon: Settings },
   ];
-
-  const handleAddWorkspace = async () => {
-    await updateProfile({ currentCoupleId: undefined });
-  };
 
   if (finance.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full"
+          className="w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full"
         />
       </div>
     );
   }
 
-  const individualIncome = filteredTransactions
-    .filter(t => t.type === 'income' && t.userId === profile?.uid)
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const individualExpense = filteredTransactions
-    .filter(t => t.type === 'expense' && t.userId === profile?.uid)
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const individualBalance = individualIncome - individualExpense;
-  const partnerBalance = balance - individualBalance;
-
-  // Chart data
-  const chartData = filteredTransactions
-    .slice(0, 10)
-    .reverse()
-    .map(t => ({
-      date: new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      amount: t.type === 'income' ? t.amount : -t.amount
-    }));
-
-  const expenseByCategory = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc: any, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {});
-
-  const pieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
-  const COLORS = ['#7C3AED', '#F97316', '#10B981', '#3B82F6', '#EF4444', '#F59E0B'];
-
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 flex transition-colors duration-300">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-[280px] border-r border-slate-800 bg-slate-900/50 flex-col flex-shrink-0 sticky top-0 h-screen">
-        <div className="p-4 border-b border-slate-800 relative">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex transition-colors duration-300">
+      {/* Desktop Sidebar Navigation */}
+      <aside className="hidden lg:flex w-[260px] border-r border-zinc-800/80 bg-zinc-950/90 flex-col flex-shrink-0 sticky top-0 h-screen z-30">
+        <div className="p-4 border-b border-zinc-800/80 relative">
           <div className="px-3 mb-2 flex items-center gap-2">
-            <div className="w-6 h-1 bg-primary rounded-full" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Gestor Financeiro</span>
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Gestor Financeiro</span>
           </div>
+
           <button 
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-primary/20 transition-all group"
+            className="w-full flex items-center justify-between p-3 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all group"
           >
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-9 h-9 bg-slate-800 rounded-lg flex items-center justify-center shadow-sm border border-slate-700 flex-shrink-0">
-                {finance.coupleData?.type === 'Business' ? <Briefcase className="w-5 h-5 text-slate-300" /> : <UserIcon className="w-5 h-5 text-primary" />}
+              <div className="w-8 h-8 bg-zinc-800 rounded-xl flex items-center justify-center text-emerald-400 font-bold border border-zinc-700 flex-shrink-0">
+                <Briefcase className="w-4 h-4" />
               </div>
               <div className="text-left overflow-hidden">
-                <span className="block font-bold text-sm tracking-tight text-white truncate">
-                  {finance.coupleData?.name || 'Carregando...'}
+                <span className="block font-bold text-xs text-white truncate">
+                  {finance.coupleData?.name || 'Espaço Principal'}
                 </span>
-                <span className="block text-[10px] text-emerald-500 font-bold uppercase tracking-widest leading-none mt-1">
-                  Ativo Agora
+                <span className="block text-[9px] text-emerald-400 font-bold uppercase tracking-widest leading-none mt-0.5">
+                  Ativo
                 </span>
               </div>
             </div>
-            <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform flex-shrink-0", showWorkspaceMenu && "rotate-180")} />
+            <ChevronDown className={cn("w-4 h-4 text-zinc-400 transition-transform flex-shrink-0", showWorkspaceMenu && "rotate-180")} />
           </button>
 
-          {/* Simple Dropdown for Switching */}
+          {/* Workspace Switch Dropdown */}
           <AnimatePresence>
             {showWorkspaceMenu && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute top-[calc(100%+8px)] left-4 right-4 bg-white border border-[#E2E8F0] rounded-2xl shadow-2xl z-50 p-2 space-y-1"
+                className="absolute top-[calc(100%+8px)] left-4 right-4 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl z-50 p-2 space-y-1"
               >
-                <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800 mb-1">
-                  Seus Perfis
+                <div className="px-3 py-1.5 text-[9px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 mb-1">
+                  Seus Espaços
                 </div>
                 {profile?.workspaceIds?.map(id => (
                   <button
@@ -208,847 +322,465 @@ export default function Dashboard() {
                       setShowWorkspaceMenu(false);
                     }}
                     className={cn(
-                      "w-full flex items-center gap-2 p-2 rounded-lg text-xs font-bold transition-all",
-                      profile.currentCoupleId === id ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800"
+                      "w-full flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition-all",
+                      profile.currentCoupleId === id ? "bg-emerald-500/10 text-emerald-400" : "text-zinc-400 hover:bg-zinc-900"
                     )}
                   >
-                    {id === profile.currentCoupleId && <div className="w-1 h-1 bg-primary rounded-full" />}
-                    Espaço {id.substring(6, 10).toUpperCase()}
+                    {id === profile.currentCoupleId && <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
+                    Espaço {id.substring(0, 8).toUpperCase()}
                   </button>
                 ))}
                 <button 
-                  onClick={handleAddWorkspace}
-                  className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-bold text-emerald-500 hover:bg-emerald-500/10 transition-all mt-2 border-t border-slate-800 pt-3"
+                  onClick={async () => updateProfile({ currentCoupleId: undefined })}
+                  className="w-full flex items-center gap-2 p-2 rounded-xl text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all mt-2 border-t border-zinc-800 pt-2"
                 >
-                  <Plus className="w-3 h-3" /> Novo Perfil
+                  <Plus className="w-3.5 h-3.5" /> Criar Novo Espaço
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
         
-        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
-          <button 
-            onClick={() => setActiveTab('home')}
-            className={cn(
-              "w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all text-sm",
-              activeTab === 'home' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
-            )}
-          >
-            <InfinityIcon className="w-5 h-5" /> Início
-          </button>
-          <button 
-            onClick={() => setActiveTab('debts')}
-            className={cn(
-              "w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all text-sm",
-              activeTab === 'debts' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
-            )}
-          >
-            <CreditCard className="w-5 h-5" /> Movimentações
-          </button>
-          <button 
-            onClick={() => setActiveTab('goals')}
-            className={cn(
-              "w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all text-sm",
-              activeTab === 'goals' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
-            )}
-          >
-            <Flag className="w-5 h-5" /> Objetivos
-          </button>
-          <button 
-            onClick={() => setActiveTab('calendar')}
-            className={cn(
-              "w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all text-sm",
-              activeTab === 'calendar' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
-            )}
-          >
-            <Calendar className="w-5 h-5" /> Calendário
-          </button>
-          <button 
-            onClick={() => setActiveTab('relationship')}
-            className={cn(
-              "w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all text-sm",
-              activeTab === 'relationship' ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-slate-800/50"
-            )}
-          >
-            <Heart className="w-5 h-5" /> Relacionamento
-          </button>
+        {/* Navigation Items */}
+        <nav className="flex-1 px-3 space-y-1 mt-3 overflow-y-auto custom-scrollbar">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as TabType)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border",
+                  isActive 
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-sm" 
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                )}
+              >
+                <Icon className={cn("w-4 h-4", isActive ? "text-emerald-400" : "text-zinc-500")} />
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Footer Sidebar Area */}
-        <div className="p-4 bg-slate-900/50 border-t border-slate-800 space-y-4">
-          {/* User Info */}
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 border border-slate-700">
-               {profile?.photoURL ? (
-                 <img src={profile.photoURL} alt={profile.displayName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-               ) : (
-                 <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold text-xs">
-                   {profile?.displayName?.charAt(0) || 'U'}
-                 </div>
-               )}
-            </div>
-            <div className="min-w-0 flex-1">
+        {/* Footer User Info */}
+        <div className="p-4 border-t border-zinc-800/80 bg-zinc-950/60 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            {profile?.photoURL ? (
+              <img src={profile.photoURL} alt="User" className="w-8 h-8 rounded-full border border-zinc-700" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold text-xs">
+                {profile?.displayName?.charAt(0) || 'U'}
+              </div>
+            )}
+            <div className="overflow-hidden">
               <p className="text-xs font-bold text-white truncate">{profile?.displayName || 'Usuário'}</p>
-              <p className="text-[10px] text-slate-500 truncate">{profile?.email}</p>
+              <p className="text-[9px] text-zinc-500 truncate">{profile?.email}</p>
             </div>
           </div>
-
-          {/* Theme Switcher - Consolidado e Organizado */}
-          <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Cor do Sistema</p>
-            <div className="flex justify-between items-center px-1">
-              {[
-                { id: 'indigo', color: '#6366f1' },
-                { id: 'emerald', color: '#10b981' },
-                { id: 'rose', color: '#f43f5e' },
-                { id: 'amber', color: '#f59e0b' },
-                { id: 'slate', color: '#475569' }
-              ].map(theme => (
-                <button
-                  key={theme.id}
-                  onClick={() => updateProfile({ themeColor: theme.color })}
-                  className={cn(
-                    "w-5 h-5 rounded-full border-2 transition-all",
-                    profile?.themeColor === theme.color ? "border-white scale-110 shadow-sm" : "border-slate-900 hover:scale-110"
-                  )}
-                  style={{ backgroundColor: theme.color }}
-                  title={theme.id}
-                />
-              ))}
-            </div>
-          </div>
-
-          <button 
-            onClick={logout}
-            className="w-full flex items-center gap-3 p-3 rounded-xl font-bold text-xs text-red-500 hover:bg-red-500/10 transition-all"
-          >
-            <LogOut className="w-4 h-4" /> Sair
+          <button onClick={() => logout()} className="p-2 text-zinc-500 hover:text-rose-400 rounded-xl transition-colors">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto custom-scrollbar">
-        {/* Header */}
-        <header className="bg-[#020617]/80 backdrop-blur-xl border-b border-slate-800 h-16 flex items-center justify-between px-6 md:px-8 flex-shrink-0 sticky top-0 z-30">
+      {/* Main Content Viewport */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        {/* Top Header Bar */}
+        <header className="h-16 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between px-4 lg:px-8">
+          {/* Quick Search Trigger */}
+          <button
+            onClick={() => setShowSearchModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800/80 text-zinc-400 hover:text-white rounded-xl border border-zinc-800 text-xs transition-all w-48 sm:w-64"
+          >
+            <Search className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Buscar (Ctrl + K)...</span>
+          </button>
+
+          {/* Top Actions */}
           <div className="flex items-center gap-3">
-             <h1 className="text-base md:text-lg font-black text-white tracking-tight uppercase">
-                {activeTab === 'home' ? 'Home' : 
-                 activeTab === 'debts' ? 'Dívidas' : 
-                 activeTab === 'goals' ? 'Metas' : 
-                 activeTab === 'relationship' ? 'Ajustes' : 'Calendário'}
-             </h1>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4">
-            <button 
-              onClick={() => setShowAddModal('expense')}
-              className="bg-primary text-white p-3 rounded-full shadow-lg shadow-primary/20 hover:scale-[1.1] active:scale-[0.9] transition-all"
+            {/* Global Quick Add Button */}
+            <button
+              onClick={() => {
+                setQuickActionDefault('income');
+                setShowQuickModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all transform active:scale-95"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span className="hidden sm:inline">Nova Ação</span>
             </button>
           </div>
         </header>
 
-        <main className="p-4 md:p-10 w-full pb-32 lg:pb-10">
-          <AnimatePresence mode="wait">
+        {/* Dynamic Body Content */}
+        <div className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto space-y-8">
+          
+          {/* 1. INÍCIO / DASHBOARD */}
           {activeTab === 'home' && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6 md:space-y-8"
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-white tracking-tighter">VISÃO GERAL</h2>
-                  <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest">{months[currentMonth]} • {currentYear}</p>
+            <div className="space-y-8">
+              {/* Intelligent Alerts Banner */}
+              {intelligentAlerts.length > 0 && (
+                <div className="space-y-2">
+                  {intelligentAlerts.map(alert => (
+                    <div 
+                      key={alert.id}
+                      className="bg-zinc-950 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                          <CircleAlert className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs text-white">{alert.title}</h4>
+                          <p className="text-[11px] text-zinc-400">{alert.desc}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {/* ... existing filters ... */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <select 
-                    value={currentMonth}
-                    onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-                    className="bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
-                  </select>
-                  <select 
-                    value={currentYear}
-                    onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-                    className="bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  >
-                    {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <button 
+              )}
+
+              {/* Central Command KPI Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                {/* Saldo Atual */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Saldo Atual</span>
+                    <Wallet className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className="text-xl font-black text-white">{formatCurrency(finance.stats.balance)}</p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Disponível consolidado</p>
+                </div>
+
+                {/* Entradas Mês */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Entradas Mês</span>
+                    <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className="text-xl font-black text-emerald-400">+{formatCurrency(finance.stats.totalIncomeMonth)}</p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Receita no período</p>
+                </div>
+
+                {/* Saídas Mês */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Saídas Mês</span>
+                    <ArrowDownRight className="w-4 h-4 text-rose-400" />
+                  </div>
+                  <p className="text-xl font-black text-rose-400">-{formatCurrency(finance.stats.totalExpenseMonth)}</p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Despesas do mês</p>
+                </div>
+
+                {/* Investimentos */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Investimentos</span>
+                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <p className="text-xl font-black text-cyan-400">{formatCurrency(finance.stats.totalInvestmentsPortfolio)}</p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Patrimônio investido</p>
+                </div>
+
+                {/* Resultado do Mês */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Resultado Mês</span>
+                    <BarChart3 className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className={cn("text-xl font-black", finance.stats.monthResult >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                    {finance.stats.monthResult >= 0 ? '+' : ''}{formatCurrency(finance.stats.monthResult)}
+                  </p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Lucro / Superávit</p>
+                </div>
+
+                {/* A Receber */}
+                <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl space-y-1 hover:border-zinc-700 transition-all">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Valores a Receber</span>
+                    <Clock className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <p className="text-xl font-black text-amber-400">{formatCurrency(finance.stats.totalReceivables)}</p>
+                  <p className="text-[9px] text-zinc-500 font-bold">Clientes a receber</p>
+                </div>
+              </div>
+
+              {/* Financial Evolution Chart & Next Commitments Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Evolution Chart */}
+                <div className="lg:col-span-2 bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4 shadow-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                      <h3 className="text-base font-bold text-white">Evolução Financeira</h3>
+                    </div>
+                    <div className="flex gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl">
+                      {(['week', 'month', 'quarter', 'year'] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setChartPeriod(p)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all",
+                            chartPeriod === p ? "bg-emerald-400 text-black" : "text-zinc-400 hover:text-white"
+                          )}
+                        >
+                          {p === 'week' ? '7D' : p === 'month' ? '30D' : p === 'quarter' ? '90D' : '1 Ano'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="h-64 w-full pt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={evolutionChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                        <XAxis dataKey="date" stroke="#71717a" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#71717a" fontSize={10} tickLine={false} tickFormatter={(val) => `R$${val}`} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '12px', fontSize: '12px' }}
+                          formatter={(val: any) => formatCurrency(val)}
+                        />
+                        <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} dot={false} name="Entradas" />
+                        <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} dot={false} name="Saídas" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Próximos Compromissos Section */}
+                <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-amber-400" />
+                        <h3 className="text-base font-bold text-white">Próximos Compromissos</h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {nextCommitments.map(item => (
+                        <div key={item.id} className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-xs text-white">{item.title}</p>
+                            <p className="text-[10px] text-zinc-500 font-bold">
+                              {new Date(item.date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <span className={cn("font-bold text-xs", item.type === 'income' ? 'text-emerald-400' : 'text-rose-400')}>
+                            {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
+                          </span>
+                        </div>
+                      ))}
+
+                      {nextCommitments.length === 0 && (
+                        <p className="text-xs text-zinc-500 text-center py-8">Nenhum compromisso financeiro pendente.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Accounts & Visual Cards View */}
+              <AccountsAndCards />
+            </div>
+          )}
+
+          {/* 2. MOVIMENTAÇÕES (Ledger) */}
+          {activeTab === 'transactions' && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight uppercase">Extrato e Movimentações</h2>
+                  <p className="text-xs text-zinc-400">Histórico completo de entradas, saídas e transferências entre contas</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
                     onClick={exportToCSV}
-                    className="flex items-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold border border-zinc-800 transition-all"
                   >
-                    <Share2 className="w-4 h-4" /> Exportar
+                    <Download className="w-4 h-4 text-emerald-400" /> Exportar CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      setQuickActionDefault('income');
+                      setShowQuickModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-black font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+                  >
+                    <Plus className="w-4 h-4" /> Novo Lançamento
                   </button>
                 </div>
               </div>
 
-              {/* Partner Invite Alert - Dismissible for this session */}
-              <AnimatePresence>
-                {showInviteAlert && finance.coupleData && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="relative bg-slate-900 rounded-[2rem] p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 p-4">
-                      <button 
-                        onClick={dismissInviteAlert}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                      >
-                        <X className="w-5 h-5 text-white/50" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center flex-shrink-0">
-                        <Share2 className="w-8 h-8 text-white" />
-                      </div>
-                      <div className="text-center md:text-left">
-                        <h3 className="text-xl font-bold tracking-tight mb-1">Convide seu Parceiro ou Sócio</h3>
-                        <p className="text-white/60 text-sm max-w-md">Compartilhe este código para que outra pessoa possa gerenciar essas finanças com você em tempo real.</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center gap-2">
-                       <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Código de Convite</span>
-                       <div className="bg-white/10 px-6 py-3 rounded-xl border border-white/20 font-mono text-2xl tracking-[0.3em] font-bold">
-                         {finance.coupleData.inviteCode}
-                       </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 border-l-4 border-l-primary shadow-sm">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Saldo Combinado</p>
-                  <h2 className="text-2xl font-bold text-white">{formatCurrency(balance)}</h2>
-                  <div className="mt-3 flex items-center gap-4 text-[10px] font-bold">
-                    <div className="flex items-center gap-1 text-emerald-500">
-                      <ArrowUpRight className="w-3 h-3" />
-                      {formatCurrency(totalIncome)}
-                    </div>
-                    <div className="flex items-center gap-1 text-orange-500">
-                      <ArrowDownRight className="w-3 h-3" />
-                      {formatCurrency(totalExpense)}
-                    </div>
-                  </div>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-950 p-4 border border-zinc-800 rounded-2xl">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Filtrar por descrição..."
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
 
-                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-sm">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Gastos Mês</p>
-                  <h2 className="text-2xl font-bold text-red-500">{formatCurrency(totalExpense)}</h2>
-                </div>
-
-                <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Dívidas Ativas</p>
-                    <h2 className="text-2xl font-bold text-accent">{formatCurrency(finance.debts.reduce((acc, d) => acc + (d.status === 'active' ? d.remainingAmount : 0), 0))}</h2>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-800/50">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Pendentes:</p>
-                    <p className="text-xs font-bold text-orange-500">{formatCurrency(finance.debts.reduce((acc, d) => acc + (d.status === 'delayed' ? d.remainingAmount : 0), 0))}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Transactions & More */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                   <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-sm">
-                      <div className="flex items-center justify-between mb-8">
-                         <div className="flex flex-col md:flex-row md:items-center justify-between flex-1 gap-4 mr-4">
-                            <h3 className="font-bold text-lg whitespace-nowrap text-white">Atividade Recente</h3>
-                            <div className="flex-1 max-w-sm relative">
-                               <input 
-                                 type="text"
-                                 placeholder="Pesquisar..."
-                                 value={searchTerm}
-                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                 className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-white"
-                               />
-                               <Heart className="w-3 h-3 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                            </div>
-                         </div>
-                         <div className="flex gap-2">
-                            <button onClick={() => setShowAddModal('income')} className="bg-emerald-500 text-white p-2 rounded-xl shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all">
-                              <Plus className="w-5 h-5" />
-                            </button>
-                            <button onClick={() => setShowAddModal('expense')} className="bg-accent text-white p-2 rounded-xl shadow-lg shadow-accent/20 hover:scale-105 active:scale-95 transition-all">
-                              <Plus className="w-5 h-5 rotate-45" />
-                            </button>
-                         </div>
-                      </div>
-
-                      <div className="h-[250px] w-full mb-8">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                            <XAxis dataKey="date" hide />
-                            <YAxis hide />
-                            <Tooltip 
-                              contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                              formatter={(v: number) => formatCurrency(v)}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="amount" 
-                              stroke="#7C3AED" 
-                              strokeWidth={3} 
-                              dot={{ fill: '#7C3AED', strokeWidth: 2, r: 4 }} 
-                              activeDot={{ r: 6, fill: '#7C3AED' }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="space-y-4">
-                         {filteredTransactions.slice(0, 10).map(t => (
-                           <div key={t.id} className="flex items-center justify-between group p-3 hover:bg-slate-800/50 rounded-2xl transition-all">
-                              <div className="flex items-center gap-3">
-                                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-sm", t.type === 'income' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500')}>
-                                  {t.type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-white">{t.description}</p>
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{t.category}</p>
-                                    <span className="w-1 h-1 bg-slate-700 rounded-full" />
-                                    <p className="text-[10px] text-slate-500 font-bold">{new Date(t.date).toLocaleDateString()}</p>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <p className={cn("font-bold text-sm", t.type === 'income' ? 'text-emerald-500' : 'text-slate-100')}>
-                                  {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
-                                </p>
-                                <button 
-                                  onClick={() => {
-                                    if(confirm('Deseja realmente apagar este lançamento?')) {
-                                      finance.deleteTransaction(t.id);
-                                    }
-                                  }}
-                                  className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                                >
-                                   <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                           </div>
-                         ))}
-                         {filteredTransactions.length === 0 && (
-                           <div className="py-12 text-center">
-                             <p className="text-slate-400 text-sm font-medium">Nenhuma movimentação este mês.</p>
-                           </div>
-                         )}
-                      </div>
-                   </div>
-                               <div className="space-y-6">
-                   <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-sm">
-                      <h3 className="font-bold text-sm mb-6 uppercase tracking-widest text-slate-400 opacity-50">Gastos por Categoria</h3>
-                      <div className="h-[200px] mb-8">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={pieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                              stroke="none"
-                            >
-                              {pieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: '#0f172a',
-                                borderRadius: '1rem', 
-                                border: '1px solid #1e293b', 
-                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                color: '#f8fafc'
-                              }}
-                              itemStyle={{ color: '#f8fafc' }}
-                              formatter={(v: number) => formatCurrency(v)}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="space-y-3 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar">
-                         {pieData.map((item, index) => (
-                           <div key={item.name} className="flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.name}</span>
-                             </div>
-                             <span className="text-xs font-bold text-white">{formatCurrency(Number(item.value))}</span>
-                           </div>
-                         ))}
-                         {pieData.length === 0 && (
-                           <p className="text-[10px] text-slate-500 text-center italic">Nenhum dado de gastos este mês.</p>
-                         )}
-                       </div>
-                   </div>
-
-                   <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-bold text-sm flex items-center gap-2 text-white">
-                          <Flag className="w-4 h-4 text-accent" /> Metas Atuais
-                        </h4>
-                         <button 
-                           onClick={() => setActiveTab('goals')}
-                           className="text-primary font-bold text-[10px] uppercase tracking-widest hover:underline"
-                         >
-                           Ver todas
-                         </button>
-                      </div>
-                      <div className="space-y-4">
-                        {finance.goals.map(goal => (
-                          <div key={goal.id} className="space-y-1">
-                            <div className="flex justify-between text-xs font-bold mb-1">
-                              <span className="text-slate-300">{goal.title}</span>
-                              <span className="text-slate-500">{Math.round((goal.currentAmount/goal.targetAmount)*100)}%</span>
-                            </div>
-                            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${(goal.currentAmount/goal.targetAmount)*100}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                   </div>
-                   </div>
-
-                   <div className="bg-primary rounded-2xl p-5 text-white shadow-xl shadow-primary/20">
-                      <h3 className="font-bold mb-2 flex items-center gap-2 text-sm">
-                        <Zap className="w-4 h-4" /> Insight Financeiro
-                      </h3>
-                      <p className="text-xs leading-relaxed opacity-90">
-                        Vocês estão fazendo um ótimo trabalho! Manter o equilíbrio geométrico entre as receitas e despesas é a chave para o sucesso.
-                      </p>
-                   </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'debts' && (
-            <motion.div
-              key="debts"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-sm"
-            >
-              <DebtManagement />
-            </motion.div>
-          )}
-
-          {activeTab === 'goals' && (
-            <motion.div
-              key="goals"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-sm"
-            >
-              <GoalTracker />
-            </motion.div>
-          )}
-
-          {activeTab === 'calendar' && (
-            <motion.div
-              key="calendar"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-sm"
-            >
-              <FinancialCalendar />
-            </motion.div>
-          )}
-
-          {activeTab === 'relationship' && (
-            <motion.div
-              key="relationship"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="space-y-6"
-            >
-              <div className="bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-800 shadow-sm">
-                 <div className="flex items-center justify-between mb-8">
-                    <div>
-                       <h2 className="text-xl font-black text-white uppercase">Configurações & Sócio</h2>
-                       <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Personalize sua experiência</p>
-                    </div>
-                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                       <Heart className="w-6 h-6 text-primary fill-primary" />
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Theme and Icon Settings */}
-                    <div className="space-y-6">
-                       <div className="p-6 bg-slate-800/50 rounded-[2rem] border border-slate-800">
-                          <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Visual do Aplicativo</h4>
-                          
-                          <div className="space-y-3">
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-slate-300">Escala dos Ícones</span>
-                                <span className="text-xs font-bold text-primary">{Math.round(iconScale * 100)}%</span>
-                             </div>
-                             <input 
-                               type="range"
-                               min="0.5"
-                               max="1.5"
-                               step="0.1"
-                               value={iconScale}
-                               onChange={(e) => setIconScale(parseFloat(e.target.value))}
-                               className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
-                             />
-                          </div>
-                       </div>
-
-                       <div className="p-6 bg-slate-800/50 rounded-[2rem] border border-slate-800">
-                          <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Exportar Dados</h4>
-                          <button 
-                            onClick={exportToCSV}
-                            className="w-full py-4 bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center gap-3 text-sm font-bold text-slate-300 hover:bg-slate-700/50 transition-all shadow-sm"
-                          >
-                             <Share2 className="w-4 h-4" /> Relatório CSV (Mês Atual)
-                          </button>
-                       </div>
-                    </div>
-
-                    {/* Partner Section */}
-                    <div className="space-y-6">
-                       <div className="p-6 bg-slate-900 rounded-[2.5rem] text-white relative overflow-hidden h-full flex flex-col justify-between min-h-[300px]">
-                          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 rounded-full -mr-24 -mt-24 blur-3xl" />
-                          
-                          <div>
-                             <h3 className="text-lg font-bold mb-1 tracking-tight">Convidar Sócio</h3>
-                             <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-10">Compartilhar Acesso</p>
-                             
-                             <div className="flex flex-col items-center mb-8">
-                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-3">Seu Código Único</span>
-                                <div className="text-4xl font-mono font-black tracking-[0.2em] mb-4">
-                                   {finance.coupleData?.inviteCode}
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(finance.coupleData?.inviteCode || '');
-                                    alert('Código copiado!');
-                                  }}
-                                  className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold transition-all flex items-center gap-2"
-                                >
-                                   Copiar Código
-                                </button>
-                             </div>
-                          </div>
-
-                          <div className="mt-auto pt-6 border-t border-white/10">
-                             {finance.partner ? (
-                               <div className="flex items-center gap-4">
-                                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center font-bold text-white/50 border border-white/10 overflow-hidden">
-                                     {finance.partner.photoURL ? <img src={finance.partner.photoURL} alt="" className="w-full h-full object-cover" /> : finance.partner.displayName?.charAt(0)}
-                                  </div>
-                                  <div className="text-left">
-                                     <p className="font-bold text-white text-sm">{finance.partner.displayName}</p>
-                                     <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Membro Conectado</p>
-                                  </div>
-                               </div>
-                             ) : (
-                               <div className="flex items-center gap-4 opacity-50">
-                                  <div className="w-12 h-12 bg-white/5 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center">
-                                     <Plus className="w-4 h-4 text-white/20" />
-                                  </div>
-                                  <p className="text-xs font-medium italic text-white/40">Nenhum sócio conectado...</p>
-                               </div>
-                             )}
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-      </div>
-
-      {/* Invite Drawer (Vitrified) */}
-      <AnimatePresence>
-        {showInviteDrawer && (
-          <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowInviteDrawer(false)}>
-             <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-             />
-             <motion.div
-               initial={{ x: '100%' }}
-               animate={{ x: 0 }}
-               exit={{ x: '100%' }}
-               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-               className="relative w-full max-w-xs h-full bg-slate-900/80 backdrop-blur-2xl border-l border-slate-800 shadow-2xl p-8 flex flex-col"
-               onClick={e => e.stopPropagation()}
-             >
-                <div className="flex items-center justify-between mb-10">
-                   <h3 className="text-sm font-black uppercase tracking-widest text-white">Convidar Sócio</h3>
-                   <button onClick={() => setShowInviteDrawer(false)} className="p-2 bg-slate-800 rounded-xl text-white">
-                      <X className="w-4 h-4" />
-                   </button>
-                </div>
-
-                <div className="bg-slate-900 p-8 rounded-[2rem] text-center mb-8 relative overflow-hidden group">
-                   <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Código único</p>
-                   <code className="text-3xl font-mono font-black text-white tracking-[0.2em] block mb-6">
-                      {finance.coupleData?.inviteCode}
-                   </code>
-                   <button 
-                     onClick={() => {
-                        navigator.clipboard.writeText(finance.coupleData?.inviteCode || '');
-                        alert('Código copiado!');
-                     }}
-                     className="w-full bg-white text-slate-900 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
-                   >
-                      Copiar Código
-                   </button>
-                </div>
-                
-                <p className="text-xs text-slate-500 font-medium leading-relaxed italic border-l-2 border-primary/20 pl-4 py-2">
-                   Envie o código para seu sócio ou parceiro de negócios. Assim que ele entrar, vocês verão as finanças do workspace em tempo real.
-                </p>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Settings Modal (Classic Style) */}
-      <AnimatePresence>
-        {showSettings && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md" onClick={() => setShowSettings(false)}>
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative overflow-hidden border border-slate-800"
-                onClick={e => e.stopPropagation()}
-              >
-                 <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-xl font-black uppercase tracking-widest text-white">Ajustes do App</h2>
-                    <button onClick={() => setShowSettings(false)} className="p-2 bg-slate-800 rounded-xl text-slate-400">
-                       <X className="w-5 h-5" />
-                    </button>
-                 </div>
-
-                 <div className="space-y-8">
-                    <button 
-                      onClick={logout}
-                      className="w-full py-4 bg-red-500/10 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
+                <div className="flex gap-2">
+                  {(['ALL', 'income', 'expense', 'investment'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
+                        typeFilter === t 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                          : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800"
+                      )}
                     >
-                       <LogOut className="w-4 h-4" /> Encerrar Sessão
+                      {t === 'ALL' ? 'Todos' : t === 'income' ? 'Entradas' : t === 'expense' ? 'Saídas' : 'Investimentos'}
                     </button>
-                 </div>
-              </motion.div>
-           </div>
-        )}
-      </AnimatePresence>
+                  ))}
+                </div>
+              </div>
 
-      {/* Mobile Navigation Only */}
-      <nav className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-[2.5rem] p-2 flex items-center justify-around shadow-2xl z-50">
-        <NavItem 
-          active={activeTab === 'home'} 
-          onClick={() => setActiveTab('home')} 
-          icon={<InfinityIcon className="w-5 h-5 transition-transform" />} 
-          label="" 
-        />
-        <NavItem 
-          active={activeTab === 'debts'} 
-          onClick={() => setActiveTab('debts')} 
-          icon={<CreditCard className="w-5 h-5 transition-transform" />} 
-          label="" 
-        />
-        <NavItem 
-          active={activeTab === 'goals'} 
-          onClick={() => setActiveTab('goals')} 
-          icon={<Flag className="w-5 h-5 transition-transform" />} 
-          label="" 
-        />
-        <NavItem 
-          active={activeTab === 'calendar'} 
-          onClick={() => setActiveTab('calendar')} 
-          icon={<Calendar className="w-5 h-5 transition-transform" />} 
-          label="" 
-        />
-        <NavItem 
-          active={activeTab === 'relationship'} 
-          onClick={() => setActiveTab('relationship')} 
-          icon={<Heart className="w-5 h-5 transition-transform" />} 
-          label="" 
-        />
-      </nav>
+              {/* Transactions List */}
+              <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl">
+                <div className="divide-y divide-zinc-900">
+                  {filteredTransactions.map(t => (
+                    <div key={t.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/40 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center border",
+                          t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        )}>
+                          {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-white">{t.description}</p>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase">{new Date(t.date).toLocaleDateString('pt-BR')} • {t.category}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className={cn("font-black text-base", t.type === 'income' ? 'text-emerald-400' : 'text-rose-400')}>
+                          {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                        </p>
+                        <button
+                          onClick={() => finance.deleteTransaction(t.id)}
+                          className="text-zinc-600 hover:text-rose-400 p-1.5 rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
 
-      {/* Add Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <TransactionModal 
-            type={showAddModal} 
-            onClose={() => setShowAddModal(null)} 
-            onAdd={finance.addTransaction}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
+                  {filteredTransactions.length === 0 && (
+                    <div className="py-12 text-center text-zinc-500 text-xs">
+                      Nenhuma movimentação encontrada.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-1 p-3 rounded-3xl transition-all",
-        active ? "text-primary bg-primary/10" : "text-slate-500 hover:text-slate-300"
-      )}
-    >
-      {icon}
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-    </button>
-  );
-}
+          {/* 3. OBJETIVOS */}
+          {activeTab === 'goals' && <GoalTracker />}
 
-function TransactionModal({ 
-  type, 
-  onClose, 
-  onAdd 
-}: { 
-  type: 'income' | 'expense', 
-  onClose: () => void,
-  onAdd: (data: any) => Promise<void>
-}) {
-  const { goals } = useFinance();
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [goalId, setGoalId] = useState('');
+          {/* 4. CALENDÁRIO */}
+          {activeTab === 'calendar' && <FinancialCalendar />}
 
-  const categories = type === 'income' 
-    ? ['Salário', 'Extra', 'Investimento', 'Outros']
-    : ['Alimentação', 'Moradia', 'Lazer', 'Saúde', 'Transporte', 'Educação', 'Outros'];
+          {/* 5. INVESTIMENTOS */}
+          {activeTab === 'investments' && <InvestmentsManager />}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amount || !description || !category) return;
-    await onAdd({
-      type,
-      amount: parseFloat(amount),
-      description,
-      category,
-      goalId: goalId || null,
-      date: new Date().toISOString()
-    });
-    onClose();
-  };
+          {/* 6. TRÁFEGO */}
+          {activeTab === 'traffic' && <TrafficManager />}
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-        className="bg-slate-900 w-full max-w-md rounded-[2.5rem] border border-slate-800 p-6 md:p-8 shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-8">
-           <h2 className={cn("text-2xl font-bold", type === 'income' ? 'text-emerald-500' : 'text-accent')}>
-             {type === 'income' ? 'Nova Entrada' : 'Nova Saída'}
-           </h2>
-           <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-500">
-             <Plus className="w-6 h-6 rotate-45" />
-           </button>
+          {/* 7. CLIENTES */}
+          {activeTab === 'clients' && <ClientsManager />}
+
+          {/* 8. DÍVIDAS */}
+          {activeTab === 'debts' && <DebtManagement />}
+
+          {/* 9. RELATÓRIOS */}
+          {activeTab === 'reports' && <ReportsManager />}
+
+          {/* 10. HISTÓRICO */}
+          {activeTab === 'history' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-black text-white tracking-tight uppercase">Histórico e Auditoria</h2>
+                <p className="text-xs text-zinc-400">Registro de todas as ações e atualizações realizadas no sistema</p>
+              </div>
+
+              <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-xl space-y-4">
+                {finance.logs.map(log => (
+                  <div key={log.id} className="p-3 border-b border-zinc-900 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-white">{log.action}</p>
+                      <p className="text-[10px] text-zinc-500">{log.details}</p>
+                    </div>
+                    <span className="text-[10px] text-zinc-500 font-mono">
+                      {new Date(log.timestamp).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                ))}
+
+                {finance.logs.length === 0 && (
+                  <p className="text-xs text-zinc-500 text-center py-6">Nenhum log gravado até o momento.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 11. CONFIGURAÇÕES */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-black text-white tracking-tight uppercase">Configurações</h2>
+                <p className="text-xs text-zinc-400">Preferências da conta e configurações do espaço financeiro</p>
+              </div>
+
+              <div className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-6 max-w-xl shadow-xl">
+                <div>
+                  <label className="block text-xs font-bold text-white mb-1">Nome do Espaço</label>
+                  <p className="text-sm font-bold text-emerald-400">{finance.coupleData?.name || 'Espaço Principal'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-white mb-1">E-mail Cadastrado</label>
+                  <p className="text-sm text-zinc-300">{profile?.email}</p>
+                </div>
+
+                <div className="pt-4 border-t border-zinc-900">
+                  <button
+                    onClick={() => logout()}
+                    className="px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold rounded-xl transition-all"
+                  >
+                    Encerrar Sessão
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
+      </main>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-           <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Valor</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">R$</span>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required
-                  autoFocus
-                  placeholder="0,00"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-           </div>
+      {/* Global Quick Action Modal */}
+      <QuickActionModal
+        isOpen={showQuickModal}
+        onClose={() => setShowQuickModal(false)}
+        defaultAction={quickActionDefault}
+      />
 
-           <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Descrição</label>
-              <input 
-                type="text" 
-                required
-                placeholder="Ex: Aluguel, Mercado..."
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl font-medium text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-           </div>
-
-           <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Categoria</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                 {categories.map(cat => (
-                   <button
-                     key={cat}
-                     type="button"
-                     onClick={() => setCategory(cat)}
-                     className={cn(
-                       "py-2 px-2 rounded-xl text-[10px] md:text-xs font-bold transition-all border break-words",
-                       category === cat 
-                         ? (type === 'income' ? "bg-emerald-500 text-white border-emerald-500" : "bg-accent text-white border-accent")
-                         : "bg-slate-800 text-slate-400 border-slate-700 hover:border-primary/30"
-                     )}
-                   >
-                     {cat}
-                   </button>
-                 ))}
-              </div>
-           </div>
-
-           <button
-             type="submit"
-             className={cn(
-               "w-full py-4 rounded-2xl text-white font-bold text-lg shadow-xl transition-all hover:scale-[1.02]",
-               type === 'income' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-accent shadow-accent/20'
-             )}
-           >
-             Salvar Lançamento
-           </button>
-        </form>
-      </motion.div>
-    </motion.div>
+      {/* Global Search Popup */}
+      <GlobalSearchModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+      />
+    </div>
   );
 }

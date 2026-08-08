@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../lib/firebase';
 import { 
   collection, 
@@ -9,19 +9,24 @@ import {
   doc, 
   updateDoc, 
   deleteDoc,
-  getDoc
+  getDoc,
+  limit
 } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 
 export interface Transaction {
   id: string;
   userId: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'investment' | 'transfer';
   category: string;
   amount: number;
   description: string;
   date: string;
+  account?: string;
+  paymentMethod?: string;
   goalId?: string;
+  clientId?: string;
+  notes?: string;
 }
 
 export interface Debt {
@@ -33,15 +38,22 @@ export interface Debt {
   paidInstallments: number;
   status: 'active' | 'paid' | 'delayed';
   monthlyPayment: number;
+  dueDate?: string;
+  interestRate?: number;
+  notes?: string;
 }
 
 export interface CreditCard {
   id: string;
   name: string;
+  institution: string;
+  flag?: string;
+  lastFourDigits?: string;
   limit: number;
-  balance: number;
+  balance: number; // utilized limit
   closingDay: number;
   dueDate: number;
+  color?: string;
 }
 
 export interface Goal {
@@ -52,6 +64,62 @@ export interface Goal {
   currentAmount: number;
   deadline: string;
   status: 'in_progress' | 'completed';
+  description?: string;
+}
+
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  type: 'bank' | 'wallet' | 'digital' | 'cash' | 'other';
+  balance: number;
+  institution?: string;
+  notes?: string;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  service: string;
+  amount: number;
+  contractDate: string;
+  paymentDate: string;
+  status: 'ATIVO' | 'PENDENTE' | 'A RECEBER' | 'PAGO' | 'ATRASADO' | 'ENCERRADO';
+  notes?: string;
+}
+
+export interface Investment {
+  id: string;
+  asset: string;
+  category: 'renda_fixa' | 'acoes' | 'etfs' | 'cripto' | 'fundos' | 'outros';
+  investedAmount: number;
+  currentAmount: number;
+  quantity?: number;
+  price?: number;
+  date: string;
+  notes?: string;
+}
+
+export interface TrafficCampaign {
+  id: string;
+  name: string;
+  investment: number;
+  returnAmount: number;
+  roas: number;
+  date: string;
+  notes?: string;
+}
+
+export interface FinancialCommitment {
+  id: string;
+  title: string;
+  amount: number;
+  type: 'income' | 'expense' | 'investment';
+  dueDate: string;
+  status: 'pending' | 'completed';
+  category?: string;
+  notes?: string;
 }
 
 export interface Log {
@@ -70,6 +138,11 @@ export function useFinance() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [trafficCampaigns, setTrafficCampaigns] = useState<TrafficCampaign[]>([]);
+  const [commitments, setCommitments] = useState<FinancialCommitment[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,7 +160,6 @@ export function useFinance() {
         const data = snapshot.data();
         setCoupleData(data);
         
-        // Find partner
         const partnerId = data.partner1 === user?.uid ? data.partner2 : data.partner1;
         if (partnerId) {
           const partnerSnap = await getDoc(doc(db, 'users', partnerId));
@@ -125,10 +197,41 @@ export function useFinance() {
       setCreditCards(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CreditCard)));
     });
 
-    // Logs sync
+    // Accounts sync
+    const accountsQuery = query(collection(db, 'couples', profile.currentCoupleId, 'accounts'));
+    const unsubAccounts = onSnapshot(accountsQuery, (snapshot) => {
+      setAccounts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinancialAccount)));
+    });
+
+    // Clients sync
+    const clientsQuery = query(collection(db, 'couples', profile.currentCoupleId, 'clients'));
+    const unsubClients = onSnapshot(clientsQuery, (snapshot) => {
+      setClients(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Client)));
+    });
+
+    // Investments sync
+    const invQuery = query(collection(db, 'couples', profile.currentCoupleId, 'investments'));
+    const unsubInv = onSnapshot(invQuery, (snapshot) => {
+      setInvestments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Investment)));
+    });
+
+    // Traffic campaigns sync
+    const trafficQuery = query(collection(db, 'couples', profile.currentCoupleId, 'traffic'));
+    const unsubTraffic = onSnapshot(trafficQuery, (snapshot) => {
+      setTrafficCampaigns(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as TrafficCampaign)));
+    });
+
+    // Commitments sync
+    const commQuery = query(collection(db, 'couples', profile.currentCoupleId, 'commitments'));
+    const unsubComm = onSnapshot(commQuery, (snapshot) => {
+      setCommitments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinancialCommitment)));
+    });
+
+    // Logs sync (limited to 50 for performance)
     const logsQuery = query(
       collection(db, 'couples', profile.currentCoupleId, 'logs'),
-      orderBy('timestamp', 'desc')
+      orderBy('timestamp', 'desc'),
+      limit(50)
     );
     const unsubLogs = onSnapshot(logsQuery, (snapshot) => {
       setLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Log)));
@@ -142,95 +245,111 @@ export function useFinance() {
       unsubDebts();
       unsubGoals();
       unsubCards();
+      unsubAccounts();
+      unsubClients();
+      unsubInv();
+      unsubTraffic();
+      unsubComm();
       unsubLogs();
     };
   }, [profile?.currentCoupleId, user?.uid]);
 
+  // Memoized aggregations for fast performance
+  const stats = useMemo(() => {
+    const realTransactions = transactions.filter(t => t.type !== 'transfer');
+    
+    const balance = realTransactions.reduce((acc, t) => {
+      if (t.type === 'income') return acc + t.amount;
+      if (t.type === 'expense') return acc - t.amount;
+      return acc;
+    }, 0);
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const currentMonthTransactions = realTransactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const totalIncomeMonth = currentMonthTransactions
+      .filter(t => t.type === 'income')
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const totalExpenseMonth = currentMonthTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const totalInvestedMonth = currentMonthTransactions
+      .filter(t => t.type === 'investment')
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const monthResult = totalIncomeMonth - totalExpenseMonth;
+
+    const totalReceivables = clients
+      .filter(c => c.status === 'A RECEBER' || c.status === 'PENDENTE')
+      .reduce((acc, c) => acc + c.amount, 0);
+
+    const totalActiveDebt = debts
+      .filter(d => d.status === 'active' || d.status === 'delayed')
+      .reduce((acc, d) => acc + d.remainingAmount, 0);
+
+    const totalInvestmentsPortfolio = investments.reduce((acc, i) => acc + (i.currentAmount || i.investedAmount), 0);
+
+    return {
+      balance,
+      totalIncomeMonth,
+      totalExpenseMonth,
+      totalInvestedMonth,
+      monthResult,
+      totalReceivables,
+      totalActiveDebt,
+      totalInvestmentsPortfolio
+    };
+  }, [transactions, clients, debts, investments]);
+
+  // CRUD Methods
   const addTransaction = async (data: Omit<Transaction, 'id' | 'userId'>) => {
     if (!profile?.currentCoupleId || !user) return;
     const transRef = collection(db, 'couples', profile.currentCoupleId, 'transactions');
     await addDoc(transRef, { ...data, userId: user.uid, coupleId: profile.currentCoupleId });
     
-    // If goalId is provided, update goal amount
     if (data.goalId) {
       const goal = goals.find(g => g.id === data.goalId);
       if (goal) {
         await updateGoalAmount(goal.id, goal.currentAmount + (data.type === 'income' ? data.amount : -data.amount));
       }
     }
-    
-    await addLog(`Adicionou ${data.type === 'income' ? 'uma entrada' : 'uma saída'}: ${data.description}`);
+    await addLog(`Adicionou lançamento (${data.type}): ${data.description}`);
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const trans = transactions.find(t => t.id === id);
+    if (trans?.goalId) {
+      const goal = goals.find(g => g.id === trans.goalId);
+      if (goal) {
+        await updateGoalAmount(goal.id, goal.currentAmount - (trans.type === 'income' ? trans.amount : -trans.amount));
+      }
+    }
+    const transRef = doc(db, 'couples', profile.currentCoupleId, 'transactions', id);
+    await deleteDoc(transRef);
+    await addLog(`Removeu lançamento: ${trans?.description || ''}`);
   };
 
   const addDebt = async (data: Omit<Debt, 'id'>) => {
     if (!profile?.currentCoupleId || !user) return;
     const debtRef = collection(db, 'couples', profile.currentCoupleId, 'debts');
     await addDoc(debtRef, { ...data, userId: user.uid, coupleId: profile.currentCoupleId });
-    await addLog(`Adicionou uma nova dívida: ${data.title}`);
-  };
-
-  const addGoal = async (data: Omit<Goal, 'id'>) => {
-    if (!profile?.currentCoupleId) return;
-    const goalRef = collection(db, 'couples', profile.currentCoupleId, 'goals');
-    await addDoc(goalRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Criou uma nova meta: ${data.title}`);
-  };
-
-  const addCreditCard = async (data: Omit<CreditCard, 'id'>) => {
-    if (!profile?.currentCoupleId) return;
-    const cardRef = collection(db, 'couples', profile.currentCoupleId, 'creditCards');
-    await addDoc(cardRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Adicionou cartão de crédito: ${data.name}`);
-  };
-
-  const deleteCreditCard = async (id: string) => {
-    if (!profile?.currentCoupleId) return;
-    const cardRef = doc(db, 'couples', profile.currentCoupleId, 'creditCards', id);
-    await deleteDoc(cardRef);
-  };
-
-  const addLog = async (action: string, details: string = '') => {
-    if (!profile?.currentCoupleId || !user) return;
-    const logRef = collection(db, 'couples', profile.currentCoupleId, 'logs');
-    await addDoc(logRef, {
-      userId: user.uid,
-      coupleId: profile.currentCoupleId,
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    });
-  };
-
-  const deleteTransaction = async (id: string) => {
-    if (!profile?.currentCoupleId) return;
-    
-    // Find the transaction first to check for goalId
-    const trans = transactions.find(t => t.id === id);
-    if (trans?.goalId) {
-      const goal = goals.find(g => g.id === trans.goalId);
-      if (goal) {
-        // Reverse the amount: if it was income (add), we subtract. if it was expense (sub), we add back.
-        await updateGoalAmount(goal.id, goal.currentAmount - (trans.type === 'income' ? trans.amount : -trans.amount));
-      }
-    }
-
-    const transRef = doc(db, 'couples', profile.currentCoupleId, 'transactions', id);
-    await deleteDoc(transRef);
-    await addLog(`Removeu um lançamento: ${trans?.description || ''}`);
-  };
-
-  const deleteGoal = async (id: string) => {
-    if (!profile?.currentCoupleId) return;
-    const goalRef = doc(db, 'couples', profile.currentCoupleId, 'goals', id);
-    await deleteDoc(goalRef);
-    await addLog(`Removeu uma meta`);
+    await addLog(`Adicionou dívida: ${data.title}`);
   };
 
   const deleteDebt = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const debtRef = doc(db, 'couples', profile.currentCoupleId, 'debts', id);
     await deleteDoc(debtRef);
-    await addLog(`Removeu uma dívida`);
+    await addLog(`Removeu dívida`);
   };
 
   const payDebtInstallment = async (debt: Debt, isDelayed: boolean = false) => {
@@ -246,7 +365,6 @@ export function useFinance() {
       status: newStatus
     });
 
-    // Also add as a transaction so it shows in the calendar and history
     await addTransaction({
       description: `Parcela: ${debt.title}`,
       amount: debt.monthlyPayment,
@@ -258,11 +376,18 @@ export function useFinance() {
     await addLog(`Pagou parcela de ${debt.title}`);
   };
 
-  const markDebtDelayed = async (id: string) => {
+  const addGoal = async (data: Omit<Goal, 'id'>) => {
     if (!profile?.currentCoupleId) return;
-    const debtRef = doc(db, 'couples', profile.currentCoupleId, 'debts', id);
-    await updateDoc(debtRef, { status: 'delayed' });
-    await addLog(`Marcou dívida como atrasada`);
+    const goalRef = collection(db, 'couples', profile.currentCoupleId, 'goals');
+    await addDoc(goalRef, { ...data, coupleId: profile.currentCoupleId });
+    await addLog(`Criou meta: ${data.title}`);
+  };
+
+  const deleteGoal = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const goalRef = doc(db, 'couples', profile.currentCoupleId, 'goals', id);
+    await deleteDoc(goalRef);
+    await addLog(`Removeu meta`);
   };
 
   const updateGoalAmount = async (id: string, newAmount: number) => {
@@ -272,11 +397,130 @@ export function useFinance() {
     if (!goalDoc.exists()) return;
     const target = goalDoc.data().targetAmount;
     const status = target <= newAmount ? 'completed' : 'in_progress';
-    await updateDoc(goalRef, { 
-      currentAmount: newAmount,
-      status
+    await updateDoc(goalRef, { currentAmount: newAmount, status });
+    await addLog(`Atualizou meta`);
+  };
+
+  const addCreditCard = async (data: Omit<CreditCard, 'id'>) => {
+    if (!profile?.currentCoupleId) return;
+    const cardRef = collection(db, 'couples', profile.currentCoupleId, 'creditCards');
+    await addDoc(cardRef, { ...data, coupleId: profile.currentCoupleId });
+    await addLog(`Adicionou cartão: ${data.name}`);
+  };
+
+  const deleteCreditCard = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const cardRef = doc(db, 'couples', profile.currentCoupleId, 'creditCards', id);
+    await deleteDoc(cardRef);
+    await addLog(`Removeu cartão`);
+  };
+
+  const addAccount = async (data: Omit<FinancialAccount, 'id'>) => {
+    if (!profile?.currentCoupleId) return;
+    const accRef = collection(db, 'couples', profile.currentCoupleId, 'accounts');
+    await addDoc(accRef, { ...data, coupleId: profile.currentCoupleId });
+    await addLog(`Adicionou conta: ${data.name}`);
+  };
+
+  const deleteAccount = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const accRef = doc(db, 'couples', profile.currentCoupleId, 'accounts', id);
+    await deleteDoc(accRef);
+    await addLog(`Removeu conta`);
+  };
+
+  const addClient = async (data: Omit<Client, 'id'>) => {
+    if (!profile?.currentCoupleId) return;
+    const clientRef = collection(db, 'couples', profile.currentCoupleId, 'clients');
+    await addDoc(clientRef, { ...data, coupleId: profile.currentCoupleId });
+    await addLog(`Cadastrou cliente: ${data.name}`);
+  };
+
+  const updateClientStatus = async (id: string, status: Client['status']) => {
+    if (!profile?.currentCoupleId) return;
+    const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', id);
+    await updateDoc(clientRef, { status });
+    await addLog(`Atualizou status do cliente para ${status}`);
+  };
+
+  const deleteClient = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', id);
+    await deleteDoc(clientRef);
+    await addLog(`Removeu cliente`);
+  };
+
+  const addInvestment = async (data: Omit<Investment, 'id'>) => {
+    if (!profile?.currentCoupleId) return;
+    const invRef = collection(db, 'couples', profile.currentCoupleId, 'investments');
+    await addDoc(invRef, { ...data, coupleId: profile.currentCoupleId });
+    
+    await addTransaction({
+      description: `Aporte: ${data.asset}`,
+      amount: data.investedAmount,
+      category: 'Investimentos',
+      date: data.date || new Date().toISOString(),
+      type: 'investment'
     });
-    await addLog(`Atualizou progresso de uma meta`);
+
+    await addLog(`Adicionou investimento em ${data.asset}`);
+  };
+
+  const deleteInvestment = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const invRef = doc(db, 'couples', profile.currentCoupleId, 'investments', id);
+    await deleteDoc(invRef);
+    await addLog(`Removeu investimento`);
+  };
+
+  const addTrafficCampaign = async (data: Omit<TrafficCampaign, 'id' | 'roas'>) => {
+    if (!profile?.currentCoupleId) return;
+    const roas = data.investment > 0 ? parseFloat((data.returnAmount / data.investment).toFixed(2)) : 0;
+    const trafficRef = collection(db, 'couples', profile.currentCoupleId, 'traffic');
+    await addDoc(trafficRef, { ...data, roas, coupleId: profile.currentCoupleId });
+
+    await addTransaction({
+      description: `Tráfego Pago: ${data.name}`,
+      amount: data.investment,
+      category: 'Tráfego Pago',
+      date: data.date || new Date().toISOString(),
+      type: 'expense'
+    });
+
+    await addLog(`Registrou campanha de tráfego: ${data.name}`);
+  };
+
+  const deleteTrafficCampaign = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const trafficRef = doc(db, 'couples', profile.currentCoupleId, 'traffic', id);
+    await deleteDoc(trafficRef);
+    await addLog(`Removeu campanha de tráfego`);
+  };
+
+  const addCommitment = async (data: Omit<FinancialCommitment, 'id'>) => {
+    if (!profile?.currentCoupleId) return;
+    const commRef = collection(db, 'couples', profile.currentCoupleId, 'commitments');
+    await addDoc(commRef, { ...data, coupleId: profile.currentCoupleId });
+    await addLog(`Criou compromisso: ${data.title}`);
+  };
+
+  const deleteCommitment = async (id: string) => {
+    if (!profile?.currentCoupleId) return;
+    const commRef = doc(db, 'couples', profile.currentCoupleId, 'commitments', id);
+    await deleteDoc(commRef);
+    await addLog(`Removeu compromisso`);
+  };
+
+  const addLog = async (action: string, details: string = '') => {
+    if (!profile?.currentCoupleId || !user) return;
+    const logRef = collection(db, 'couples', profile.currentCoupleId, 'logs');
+    await addDoc(logRef, {
+      userId: user.uid,
+      coupleId: profile.currentCoupleId,
+      action,
+      details,
+      timestamp: new Date().toISOString()
+    });
   };
 
   return {
@@ -286,19 +530,35 @@ export function useFinance() {
     debts,
     goals,
     creditCards,
+    accounts,
+    clients,
+    investments,
+    trafficCampaigns,
+    commitments,
     logs,
+    stats,
     loading,
     addTransaction,
     deleteTransaction,
     addDebt,
     deleteDebt,
     payDebtInstallment,
-    markDebtDelayed,
     addGoal,
     deleteGoal,
     updateGoalAmount,
     addCreditCard,
     deleteCreditCard,
+    addAccount,
+    deleteAccount,
+    addClient,
+    updateClientStatus,
+    deleteClient,
+    addInvestment,
+    deleteInvestment,
+    addTrafficCampaign,
+    deleteTrafficCampaign,
+    addCommitment,
+    deleteCommitment,
     addLog
   };
 }
