@@ -10,7 +10,8 @@ import {
   updateDoc, 
   deleteDoc,
   getDoc,
-  limit
+  limit,
+  arrayUnion
 } from 'firebase/firestore';
 import { useAuth } from './useAuth';
 
@@ -22,11 +23,17 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
-  account?: string;
+  accountId?: string;
+  accountName?: string;
   paymentMethod?: string;
   goalId?: string;
   clientId?: string;
+  clientName?: string;
+  paymentId?: string;
+  source?: 'MANUAL' | 'CLIENT_PAYMENT' | 'TRAFFIC_EXPENSE' | 'DEBT_PAYMENT' | 'INVESTMENT' | 'TRANSFER';
+  sourceId?: string;
   notes?: string;
+  userName?: string;
 }
 
 export interface Debt {
@@ -76,17 +83,33 @@ export interface FinancialAccount {
   notes?: string;
 }
 
+export interface ClientPayment {
+  id: string;
+  amount: number;
+  date: string;
+  accountId?: string;
+  accountName?: string;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+  userName?: string;
+}
+
 export interface Client {
   id: string;
   name: string;
   phone?: string;
   email?: string;
   service: string;
-  amount: number;
+  amount?: number; // legacy alias for totalAmount
+  totalAmount: number; // Contract total amount
+  paidAmount: number; // Accumulated payments
+  remainingAmount: number; // totalAmount - paidAmount
   contractDate: string;
-  paymentDate: string;
-  status: 'ATIVO' | 'PENDENTE' | 'A RECEBER' | 'PAGO' | 'ATRASADO' | 'ENCERRADO';
+  paymentDate: string; // Due date
+  status: 'AGUARDANDO' | 'PAGAMENTO PARCIAL' | 'PAGO' | 'ATRASADO' | 'CANCELADO' | 'ATIVO' | 'PENDENTE' | 'A RECEBER';
   notes?: string;
+  payments?: ClientPayment[];
 }
 
 export interface Investment {
@@ -108,6 +131,8 @@ export interface TrafficCampaign {
   returnAmount: number;
   roas: number;
   date: string;
+  accountId?: string;
+  accountName?: string;
   notes?: string;
 }
 
@@ -145,6 +170,8 @@ export function useFinance() {
   const [commitments, setCommitments] = useState<FinancialCommitment[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const currentUserName = profile?.displayName || user?.displayName || user?.email || 'Usuário';
 
   useEffect(() => {
     if (!profile?.currentCoupleId) {
@@ -206,7 +233,20 @@ export function useFinance() {
     // Clients sync
     const clientsQuery = query(collection(db, 'couples', profile.currentCoupleId, 'clients'));
     const unsubClients = onSnapshot(clientsQuery, (snapshot) => {
-      setClients(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Client)));
+      setClients(snapshot.docs.map(d => {
+        const data = d.data();
+        const total = data.totalAmount ?? data.amount ?? 0;
+        const paid = data.paidAmount ?? (data.status === 'PAGO' ? total : 0);
+        const remaining = data.remainingAmount ?? Math.max(0, total - paid);
+        return {
+          id: d.id,
+          ...data,
+          totalAmount: total,
+          paidAmount: paid,
+          remainingAmount: remaining,
+          payments: data.payments || []
+        } as Client;
+      }));
     });
 
     // Investments sync
@@ -287,9 +327,10 @@ export function useFinance() {
 
     const monthResult = totalIncomeMonth - totalExpenseMonth;
 
+    // Total receivables calculation (sum of remainingAmount for clients not fully paid)
     const totalReceivables = clients
-      .filter(c => c.status === 'A RECEBER' || c.status === 'PENDENTE')
-      .reduce((acc, c) => acc + c.amount, 0);
+      .filter(c => c.status !== 'PAGO' && c.status !== 'CANCELADO')
+      .reduce((acc, c) => acc + (c.remainingAmount ?? (c.totalAmount || c.amount || 0)), 0);
 
     const totalActiveDebt = debts
       .filter(d => d.status === 'active' || d.status === 'delayed')
@@ -309,11 +350,36 @@ export function useFinance() {
     };
   }, [transactions, clients, debts, investments]);
 
+  // Helper to adjust Account Balance in Firestore
+  const updateAccountBalance = async (accountId: string, deltaAmount: number) => {
+    if (!profile?.currentCoupleId || !accountId) return;
+    const accRef = doc(db, 'couples', profile.currentCoupleId, 'accounts', accountId);
+    const accSnap = await getDoc(accRef);
+    if (accSnap.exists()) {
+      const currentBal = accSnap.data().balance || 0;
+      await updateDoc(accRef, { balance: currentBal + deltaAmount });
+    }
+  };
+
   // CRUD Methods
   const addTransaction = async (data: Omit<Transaction, 'id' | 'userId'>) => {
     if (!profile?.currentCoupleId || !user) return;
     const transRef = collection(db, 'couples', profile.currentCoupleId, 'transactions');
-    await addDoc(transRef, { ...data, userId: user.uid, coupleId: profile.currentCoupleId });
+    await addDoc(transRef, { 
+      ...data, 
+      userId: user.uid, 
+      coupleId: profile.currentCoupleId,
+      source: data.source || 'MANUAL',
+      userName: currentUserName
+    });
+
+    // If accountId is provided, adjust account balance
+    if (data.accountId) {
+      const delta = data.type === 'income' ? data.amount : data.type === 'expense' ? -data.amount : 0;
+      if (delta !== 0) {
+        await updateAccountBalance(data.accountId, delta);
+      }
+    }
     
     if (data.goalId) {
       const goal = goals.find(g => g.id === data.goalId);
@@ -321,12 +387,18 @@ export function useFinance() {
         await updateGoalAmount(goal.id, goal.currentAmount + (data.type === 'income' ? data.amount : -data.amount));
       }
     }
-    await addLog(`Adicionou lançamento (${data.type}): ${data.description}`);
+    await addLog(`${currentUserName} adicionou lançamento (${data.type}): ${data.description}`);
   };
 
   const deleteTransaction = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const trans = transactions.find(t => t.id === id);
+    if (trans?.accountId) {
+      const delta = trans.type === 'income' ? -trans.amount : trans.type === 'expense' ? trans.amount : 0;
+      if (delta !== 0) {
+        await updateAccountBalance(trans.accountId, delta);
+      }
+    }
     if (trans?.goalId) {
       const goal = goals.find(g => g.id === trans.goalId);
       if (goal) {
@@ -335,24 +407,24 @@ export function useFinance() {
     }
     const transRef = doc(db, 'couples', profile.currentCoupleId, 'transactions', id);
     await deleteDoc(transRef);
-    await addLog(`Removeu lançamento: ${trans?.description || ''}`);
+    await addLog(`${currentUserName} removeu lançamento: ${trans?.description || ''}`);
   };
 
   const addDebt = async (data: Omit<Debt, 'id'>) => {
     if (!profile?.currentCoupleId || !user) return;
     const debtRef = collection(db, 'couples', profile.currentCoupleId, 'debts');
     await addDoc(debtRef, { ...data, userId: user.uid, coupleId: profile.currentCoupleId });
-    await addLog(`Adicionou dívida: ${data.title}`);
+    await addLog(`${currentUserName} adicionou dívida: ${data.title}`);
   };
 
   const deleteDebt = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const debtRef = doc(db, 'couples', profile.currentCoupleId, 'debts', id);
     await deleteDoc(debtRef);
-    await addLog(`Removeu dívida`);
+    await addLog(`${currentUserName} removeu dívida`);
   };
 
-  const payDebtInstallment = async (debt: Debt, isDelayed: boolean = false) => {
+  const payDebtInstallment = async (debt: Debt, isDelayed: boolean = false, accountId?: string) => {
     if (!profile?.currentCoupleId) return;
     const debtRef = doc(db, 'couples', profile.currentCoupleId, 'debts', debt.id);
     const newRemaining = Math.max(0, debt.remainingAmount - debt.monthlyPayment);
@@ -365,29 +437,36 @@ export function useFinance() {
       status: newStatus
     });
 
+    const selectedAcc = accounts.find(a => a.id === accountId);
+
     await addTransaction({
-      description: `Parcela: ${debt.title}`,
+      description: `Parcela Dívida: ${debt.title}`,
       amount: debt.monthlyPayment,
       category: 'Dívidas',
       date: new Date().toISOString(),
-      type: 'expense'
+      type: 'expense',
+      accountId: accountId,
+      accountName: selectedAcc?.name,
+      source: 'DEBT_PAYMENT',
+      sourceId: debt.id,
+      userName: currentUserName
     });
 
-    await addLog(`Pagou parcela de ${debt.title}`);
+    await addLog(`${currentUserName} pagou parcela de ${debt.title}`);
   };
 
   const addGoal = async (data: Omit<Goal, 'id'>) => {
     if (!profile?.currentCoupleId) return;
     const goalRef = collection(db, 'couples', profile.currentCoupleId, 'goals');
     await addDoc(goalRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Criou meta: ${data.title}`);
+    await addLog(`${currentUserName} criou meta: ${data.title}`);
   };
 
   const deleteGoal = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const goalRef = doc(db, 'couples', profile.currentCoupleId, 'goals', id);
     await deleteDoc(goalRef);
-    await addLog(`Removeu meta`);
+    await addLog(`${currentUserName} removeu meta`);
   };
 
   const updateGoalAmount = async (id: string, newAmount: number) => {
@@ -398,56 +477,226 @@ export function useFinance() {
     const target = goalDoc.data().targetAmount;
     const status = target <= newAmount ? 'completed' : 'in_progress';
     await updateDoc(goalRef, { currentAmount: newAmount, status });
-    await addLog(`Atualizou meta`);
+    await addLog(`${currentUserName} atualizou meta`);
   };
 
   const addCreditCard = async (data: Omit<CreditCard, 'id'>) => {
     if (!profile?.currentCoupleId) return;
     const cardRef = collection(db, 'couples', profile.currentCoupleId, 'creditCards');
     await addDoc(cardRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Adicionou cartão: ${data.name}`);
+    await addLog(`${currentUserName} adicionou cartão: ${data.name}`);
   };
 
   const deleteCreditCard = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const cardRef = doc(db, 'couples', profile.currentCoupleId, 'creditCards', id);
     await deleteDoc(cardRef);
-    await addLog(`Removeu cartão`);
+    await addLog(`${currentUserName} removeu cartão`);
   };
 
   const addAccount = async (data: Omit<FinancialAccount, 'id'>) => {
     if (!profile?.currentCoupleId) return;
     const accRef = collection(db, 'couples', profile.currentCoupleId, 'accounts');
     await addDoc(accRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Adicionou conta: ${data.name}`);
+    await addLog(`${currentUserName} adicionou conta: ${data.name}`);
   };
 
   const deleteAccount = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const accRef = doc(db, 'couples', profile.currentCoupleId, 'accounts', id);
     await deleteDoc(accRef);
-    await addLog(`Removeu conta`);
+    await addLog(`${currentUserName} removeu conta`);
   };
 
-  const addClient = async (data: Omit<Client, 'id'>) => {
+  // CLIENT MANAGEMENT & FINANCIAL INTEGRATION
+  const addClient = async (data: {
+    name: string;
+    phone?: string;
+    email?: string;
+    service: string;
+    totalAmount: number;
+    contractDate: string;
+    paymentDate: string;
+    notes?: string;
+  }) => {
     if (!profile?.currentCoupleId) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isOverdue = data.paymentDate < todayStr;
+    const initialStatus: Client['status'] = isOverdue ? 'ATRASADO' : 'AGUARDANDO';
+
     const clientRef = collection(db, 'couples', profile.currentCoupleId, 'clients');
-    await addDoc(clientRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Cadastrou cliente: ${data.name}`);
+    await addDoc(clientRef, {
+      name: data.name,
+      phone: data.phone || '',
+      email: data.email || '',
+      service: data.service,
+      totalAmount: data.totalAmount,
+      amount: data.totalAmount, // Legacy alias compatibility
+      paidAmount: 0,
+      remainingAmount: data.totalAmount,
+      contractDate: data.contractDate || todayStr,
+      paymentDate: data.paymentDate || todayStr,
+      status: initialStatus,
+      notes: data.notes || '',
+      payments: [],
+      coupleId: profile.currentCoupleId
+    });
+
+    await addLog(`${currentUserName} cadastrou cliente ${data.name} (Valor Total: R$ ${data.totalAmount})`);
+  };
+
+  /**
+   * Registers a real partial or total payment for a client.
+   * Updates client paidAmount, remainingAmount, status, account balance, creates a real Income Transaction, and logs.
+   */
+  const registerClientPayment = async (data: {
+    clientId: string;
+    amount: number;
+    date: string;
+    accountId?: string;
+    paymentMethod?: string;
+    notes?: string;
+  }) => {
+    if (!profile?.currentCoupleId || !user) return;
+
+    const client = clients.find(c => c.id === data.clientId);
+    if (!client) throw new Error('Cliente não encontrado.');
+
+    const paymentAmount = Math.max(0, data.amount);
+    if (paymentAmount <= 0) throw new Error('O valor do pagamento deve ser superior a zero.');
+
+    const newPaidAmount = (client.paidAmount || 0) + paymentAmount;
+    const newRemainingAmount = Math.max(0, (client.totalAmount || client.amount || 0) - newPaidAmount);
+
+    let newStatus: Client['status'] = 'AGUARDANDO';
+    if (newRemainingAmount <= 0) {
+      newStatus = 'PAGO';
+    } else if (newPaidAmount > 0) {
+      newStatus = 'PAGAMENTO PARCIAL';
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (client.paymentDate < todayStr) {
+        newStatus = 'ATRASADO';
+      }
+    }
+
+    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const selectedAccount = accounts.find(a => a.id === data.accountId);
+
+    const paymentObj: ClientPayment = {
+      id: paymentId,
+      amount: paymentAmount,
+      date: data.date || new Date().toISOString(),
+      accountId: data.accountId || '',
+      accountName: selectedAccount?.name || 'Geral',
+      paymentMethod: data.paymentMethod || 'PIX',
+      notes: data.notes || '',
+      userName: currentUserName
+    };
+
+    // 1. Create automatic Income Transaction (checking against duplicate sourceId)
+    const existingTrans = transactions.find(t => t.sourceId === paymentId);
+    if (!existingTrans) {
+      const transRef = collection(db, 'couples', profile.currentCoupleId, 'transactions');
+      await addDoc(transRef, {
+        userId: user.uid,
+        coupleId: profile.currentCoupleId,
+        type: 'income',
+        amount: paymentAmount,
+        description: `Pagamento ${client.name}`,
+        category: 'Clientes / Serviços',
+        date: data.date || new Date().toISOString(),
+        accountId: data.accountId || '',
+        accountName: selectedAccount?.name || '',
+        paymentMethod: data.paymentMethod || 'PIX',
+        clientId: client.id,
+        clientName: client.name,
+        paymentId: paymentId,
+        source: 'CLIENT_PAYMENT',
+        sourceId: paymentId,
+        userName: currentUserName,
+        notes: data.notes || ''
+      });
+
+      // 2. Increase selected account balance
+      if (data.accountId) {
+        await updateAccountBalance(data.accountId, paymentAmount);
+      }
+    }
+
+    // 3. Update client doc in Firestore
+    const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', client.id);
+    await updateDoc(clientRef, {
+      paidAmount: newPaidAmount,
+      remainingAmount: newRemainingAmount,
+      status: newStatus,
+      payments: arrayUnion(paymentObj)
+    });
+
+    await addLog(
+      `${currentUserName} registrou pagamento de R$ ${paymentAmount} para o cliente ${client.name} (${newStatus === 'PAGO' ? 'Quitado' : 'Restante: R$ ' + newRemainingAmount})`
+    );
+  };
+
+  /**
+   * Reverts / cancels a specific client payment and adjusts financial balances & logs
+   */
+  const revertClientPayment = async (clientId: string, paymentId: string) => {
+    if (!profile?.currentCoupleId) return;
+
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !client.payments) return;
+
+    const payment = client.payments.find(p => p.id === paymentId);
+    if (!payment) return;
+
+    const updatedPayments = client.payments.filter(p => p.id !== paymentId);
+    const newPaidAmount = Math.max(0, (client.paidAmount || 0) - payment.amount);
+    const newRemainingAmount = Math.max(0, (client.totalAmount || client.amount || 0) - newPaidAmount);
+
+    let newStatus: Client['status'] = 'AGUARDANDO';
+    if (newRemainingAmount <= 0) {
+      newStatus = 'PAGO';
+    } else if (newPaidAmount > 0) {
+      newStatus = 'PAGAMENTO PARCIAL';
+    }
+
+    // Deduct from account balance if accountId exists
+    if (payment.accountId) {
+      await updateAccountBalance(payment.accountId, -payment.amount);
+    }
+
+    // Delete associated income transaction
+    const trans = transactions.find(t => t.paymentId === paymentId || t.sourceId === paymentId);
+    if (trans) {
+      await deleteDoc(doc(db, 'couples', profile.currentCoupleId, 'transactions', trans.id));
+    }
+
+    // Update client document
+    const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', client.id);
+    await updateDoc(clientRef, {
+      paidAmount: newPaidAmount,
+      remainingAmount: newRemainingAmount,
+      status: newStatus,
+      payments: updatedPayments
+    });
+
+    await addLog(`${currentUserName} estornou/cancelou o pagamento de R$ ${payment.amount} do cliente ${client.name}`);
   };
 
   const updateClientStatus = async (id: string, status: Client['status']) => {
     if (!profile?.currentCoupleId) return;
     const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', id);
     await updateDoc(clientRef, { status });
-    await addLog(`Atualizou status do cliente para ${status}`);
+    await addLog(`${currentUserName} alterou o status do cliente para ${status}`);
   };
 
   const deleteClient = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const clientRef = doc(db, 'couples', profile.currentCoupleId, 'clients', id);
     await deleteDoc(clientRef);
-    await addLog(`Removeu cliente`);
+    await addLog(`${currentUserName} removeu cliente`);
   };
 
   const addInvestment = async (data: Omit<Investment, 'id'>) => {
@@ -460,55 +709,92 @@ export function useFinance() {
       amount: data.investedAmount,
       category: 'Investimentos',
       date: data.date || new Date().toISOString(),
-      type: 'investment'
+      type: 'investment',
+      source: 'INVESTMENT',
+      userName: currentUserName
     });
 
-    await addLog(`Adicionou investimento em ${data.asset}`);
+    await addLog(`${currentUserName} adicionou investimento em ${data.asset}`);
   };
 
   const deleteInvestment = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const invRef = doc(db, 'couples', profile.currentCoupleId, 'investments', id);
     await deleteDoc(invRef);
-    await addLog(`Removeu investimento`);
+    await addLog(`${currentUserName} removeu investimento`);
   };
 
-  const addTrafficCampaign = async (data: Omit<TrafficCampaign, 'id' | 'roas'>) => {
-    if (!profile?.currentCoupleId) return;
+  // REAL INTEGRATION FOR TRAFFIC EXPENSE
+  const addTrafficCampaign = async (data: {
+    name: string;
+    investment: number;
+    returnAmount: number;
+    date: string;
+    accountId?: string;
+    notes?: string;
+  }) => {
+    if (!profile?.currentCoupleId || !user) return;
     const roas = data.investment > 0 ? parseFloat((data.returnAmount / data.investment).toFixed(2)) : 0;
-    const trafficRef = collection(db, 'couples', profile.currentCoupleId, 'traffic');
-    await addDoc(trafficRef, { ...data, roas, coupleId: profile.currentCoupleId });
+    
+    const selectedAccount = accounts.find(a => a.id === data.accountId);
 
+    const trafficRef = collection(db, 'couples', profile.currentCoupleId, 'traffic');
+    const newDoc = await addDoc(trafficRef, {
+      name: data.name,
+      investment: data.investment,
+      returnAmount: data.returnAmount,
+      roas,
+      date: data.date,
+      accountId: data.accountId || '',
+      accountName: selectedAccount?.name || '',
+      notes: data.notes || '',
+      coupleId: profile.currentCoupleId
+    });
+
+    // Automatically create Expense Transaction
     await addTransaction({
-      description: `Tráfego Pago: ${data.name}`,
+      description: `Tráfego: ${data.name}`,
       amount: data.investment,
       category: 'Tráfego Pago',
       date: data.date || new Date().toISOString(),
-      type: 'expense'
+      type: 'expense',
+      accountId: data.accountId,
+      accountName: selectedAccount?.name,
+      source: 'TRAFFIC_EXPENSE',
+      sourceId: newDoc.id,
+      userName: currentUserName,
+      notes: data.notes || ''
     });
 
-    await addLog(`Registrou campanha de tráfego: ${data.name}`);
+    await addLog(`${currentUserName} registrou campanha de tráfego ${data.name} (-R$ ${data.investment})`);
   };
 
   const deleteTrafficCampaign = async (id: string) => {
     if (!profile?.currentCoupleId) return;
+
+    // Delete associated traffic transaction
+    const trans = transactions.find(t => t.sourceId === id && t.source === 'TRAFFIC_EXPENSE');
+    if (trans) {
+      await deleteTransaction(trans.id);
+    }
+
     const trafficRef = doc(db, 'couples', profile.currentCoupleId, 'traffic', id);
     await deleteDoc(trafficRef);
-    await addLog(`Removeu campanha de tráfego`);
+    await addLog(`${currentUserName} removeu campanha de tráfego`);
   };
 
   const addCommitment = async (data: Omit<FinancialCommitment, 'id'>) => {
     if (!profile?.currentCoupleId) return;
     const commRef = collection(db, 'couples', profile.currentCoupleId, 'commitments');
     await addDoc(commRef, { ...data, coupleId: profile.currentCoupleId });
-    await addLog(`Criou compromisso: ${data.title}`);
+    await addLog(`${currentUserName} criou compromisso: ${data.title}`);
   };
 
   const deleteCommitment = async (id: string) => {
     if (!profile?.currentCoupleId) return;
     const commRef = doc(db, 'couples', profile.currentCoupleId, 'commitments', id);
     await deleteDoc(commRef);
-    await addLog(`Removeu compromisso`);
+    await addLog(`${currentUserName} removeu compromisso`);
   };
 
   const addLog = async (action: string, details: string = '') => {
@@ -551,6 +837,8 @@ export function useFinance() {
     addAccount,
     deleteAccount,
     addClient,
+    registerClientPayment,
+    revertClientPayment,
     updateClientStatus,
     deleteClient,
     addInvestment,

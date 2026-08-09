@@ -650,33 +650,50 @@ export default function Dashboard() {
               {/* Transactions List */}
               <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl">
                 <div className="divide-y divide-zinc-900">
-                  {filteredTransactions.map(t => (
-                    <div key={t.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/40 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center border",
-                          t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                        )}>
-                          {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                  {filteredTransactions.map(t => {
+                    const getSourceBadge = () => {
+                      if (t.source === 'CLIENT_PAYMENT') return <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-extrabold">CLIENTE</span>;
+                      if (t.source === 'TRAFFIC_EXPENSE') return <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-extrabold">TRÁFEGO</span>;
+                      if (t.source === 'DEBT_PAYMENT') return <span className="text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded font-extrabold">DÍVIDA</span>;
+                      if (t.source === 'INVESTMENT') return <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded font-extrabold">INVESTIMENTO</span>;
+                      return null;
+                    };
+
+                    return (
+                      <div key={t.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/40 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0",
+                            t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          )}>
+                            {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-sm text-white">{t.description}</p>
+                              {getSourceBadge()}
+                            </div>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase mt-0.5">
+                              {new Date(t.date).toLocaleDateString('pt-BR')} • {t.category} {t.accountName ? `• ${t.accountName}` : ''} {t.userName ? `• por ${t.userName}` : ''}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-sm text-white">{t.description}</p>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase">{new Date(t.date).toLocaleDateString('pt-BR')} • {t.category}</p>
+                        <div className="flex items-center gap-4">
+                          <p className={cn("font-black text-base", t.type === 'income' ? 'text-emerald-400' : 'text-rose-400')}>
+                            {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                          </p>
+                          <button
+                            onClick={() => {
+                              if (confirm('Excluir esta movimentação?')) finance.deleteTransaction(t.id);
+                            }}
+                            className="p-1.5 text-zinc-600 hover:text-rose-400 rounded-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <p className={cn("font-black text-base", t.type === 'income' ? 'text-emerald-400' : 'text-rose-400')}>
-                          {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
-                        </p>
-                        <button
-                          onClick={() => finance.deleteTransaction(t.id)}
-                          className="text-zinc-600 hover:text-rose-400 p-1.5 rounded-lg transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {filteredTransactions.length === 0 && (
                     <div className="py-12 text-center text-zinc-500 text-xs">

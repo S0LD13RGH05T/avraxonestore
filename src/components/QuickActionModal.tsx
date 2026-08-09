@@ -113,10 +113,9 @@ export default function QuickActionModal({ isOpen, onClose, defaultAction }: Qui
         phone: clientPhone,
         email: clientEmail,
         service: serviceName || 'Serviço',
-        amount: numAmount,
+        totalAmount: numAmount,
         contractDate: date,
         paymentDate: date,
-        status: 'A RECEBER',
         notes
       });
     } else if (activeAction === 'goal') {
