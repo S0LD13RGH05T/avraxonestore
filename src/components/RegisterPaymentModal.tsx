@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance, Client } from '../hooks/useFinance';
 import { formatCurrency } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,19 +13,37 @@ interface RegisterPaymentModalProps {
 export default function RegisterPaymentModal({ isOpen, onClose, client }: RegisterPaymentModalProps) {
   const finance = useFinance();
 
+  // All React Hooks must be declared at the top level
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [accountId, setAccountId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('PIX');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Reset/populate form values when client or isOpen changes
+  useEffect(() => {
+    if (client && isOpen) {
+      const total = client.totalAmount || client.amount || 0;
+      const paid = client.paidAmount || 0;
+      const defaultRemaining = Math.max(0, total - paid);
+
+      setAmount(defaultRemaining > 0 ? defaultRemaining.toString() : '');
+      setDate(new Date().toISOString().split('T')[0]);
+      setAccountId(finance.accounts[0]?.id || '');
+      setPaymentMethod('PIX');
+      setNotes('');
+      setError('');
+    }
+  }, [client, isOpen, finance.accounts]);
+
+  // Conditional render after hooks declaration
   if (!isOpen || !client) return null;
 
   const total = client.totalAmount || client.amount || 0;
   const paid = client.paidAmount || 0;
   const defaultRemaining = Math.max(0, total - paid);
-
-  const [amount, setAmount] = useState(defaultRemaining > 0 ? defaultRemaining.toString() : '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [accountId, setAccountId] = useState(finance.accounts[0]?.id || '');
-  const [paymentMethod, setPaymentMethod] = useState('PIX');
-  const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
